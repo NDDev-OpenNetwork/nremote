@@ -43,12 +43,12 @@ features = ["dxgi", "dxgi1_2", "dxgi1_5", "d3d11", "winuser", "winerror", "errha
 block = "0.1"
 
 [target.'cfg(target_os = "android")'.dependencies]
-android_logger = "0.13"
-jni = "0.21"
+android_logger = "0.15"
+jni = "0.22"
 lazy_static = "1.4"
 log = "0.4"
 serde_json = "1.0"
-ndk = { version = "0.7", features = ["media"], optional = true}
+ndk = { version = "0.9", features = ["media"], optional = true}
 ndk-context = "0.1"
 
 [target.'cfg(not(target_os = "android"))'.dev-dependencies]
@@ -64,9 +64,9 @@ pkg-config = { version = "0.3.27", optional = true }
 [target.'cfg(target_os = "linux")'.dependencies]
 dbus = { version = "0.9", optional = true }
 tracing = { version = "0.1", optional = true }
-gstreamer = { version = "0.16", optional = true }
-gstreamer-app = { version = "0.16", features = ["v1_10"], optional = true }
-gstreamer-video = { version = "0.16", optional = true }
+gstreamer = { version = "0.21", optional = true }
+gstreamer-app = { version = "0.18", features = ["v1_10"], optional = true }
+gstreamer-video = { version = "0.21", optional = true }
 zbus = { version = "3.15", optional = true }
 
 [dependencies.hwcodec]
