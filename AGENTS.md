@@ -79,8 +79,16 @@ bump.
   therefore has no `osv` job and says why in its place; `dependency-review`
   holds the line against anything a pull request introduces. The build workflow
   is what unblocks this.
-- **A full application build in CI.** `ci.yml` proves what is true of the
-  source on any platform. The three-platform build is `build.yml`'s job.
+- **macOS and Android builds.** `build.yml` builds Linux x86_64 natively on a
+  GitHub-hosted runner. The other two platforms follow, each on its own
+  evidence rather than by copying a matrix entry: macOS needs its own vcpkg
+  triplet and an Apple toolchain, Android needs the NDK and `cargo-ndk`.
+  Neither is a variation on the Linux job.
+- **`build.yml` does not run on pull requests yet.** Its vcpkg set includes
+  ffmpeg with hardware-codec features, which is tens of minutes from cold. The
+  trigger is added once the binary cache is established and the warm duration
+  is measured, because putting an unmeasured cost in front of every review is a
+  tax paid on a guess.
 
 - **The user interface is not statically analysed.** CodeQL has no Dart
   extractor, and `flutter/` is 357 of this repository's files. `dart analyze`
