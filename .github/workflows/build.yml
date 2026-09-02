@@ -10,13 +10,17 @@ name: build
 # that a failure names the step that failed. macOS and Android follow, each on
 # its own evidence.
 #
-# It runs on `main` and on demand rather than on every pull request. The vcpkg
-# dependency set includes ffmpeg with hardware-codec features, which is tens of
-# minutes from cold, and putting that in front of every review before its warm
-# duration is known would be a tax paid on a guess. The pull-request trigger is
-# added once the cache is established and the timing is measured.
+# It runs on pull requests as well as on `main`, and that is measured rather
+# than assumed: the first green run took 26 minutes with a warm vcpkg cache, on
+# runners that are free for a public repository. The cost buys the one thing
+# nothing else here could prove -- that the application still compiles -- and it
+# buys it where it matters most. This repository's dependency backlog is being
+# closed by Dependabot, and a lockfile bump that breaks the build is exactly the
+# failure a review cannot catch by reading.
 
 on:
+  pull_request:
+    branches: [main]
   push:
     branches: [main]
   workflow_dispatch:
