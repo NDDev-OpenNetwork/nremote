@@ -78,11 +78,15 @@ bump.
   updates, `build.yml` compiles them and `dependency-review` refuses anything
   new. `security.yml` still has no `osv` job, because a gate that fails on a
   backlog somebody else is already clearing is noise rather than information.
-- **macOS and Android builds.** `build.yml` builds Linux x86_64 natively on a
-  GitHub-hosted runner. The other two platforms follow, each on its own
-  evidence rather than by copying a matrix entry: macOS needs its own vcpkg
-  triplet and an Apple toolchain, Android needs the NDK and `cargo-ndk`.
-  Neither is a variation on the Linux job.
+- **Signing.** The macOS build is unsigned and the Android build is
+  debug-signed, because there is no Apple Developer ID and no release keystore.
+  Both are stated in the artifact names and the release notes rather than
+  discovered on install. A debug-signed APK cannot be replaced in place by a
+  release-signed one later, so this decides the upgrade path for anyone who
+  installs one.
+- **Intel macOS and 32-bit Android** are not built. Each is one matrix entry
+  when somebody needs it; neither is worth doubling the workflow's cost on
+  speculation.
 - **The application lockfile's advisories.** `build.yml` now runs on pull
   requests, so a Dependabot bump that breaks the build is caught. That was the
   condition on clearing the backlog, and it is met; what remains is Dependabot
