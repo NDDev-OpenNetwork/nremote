@@ -88,6 +88,17 @@ jobs:
         with:
           toolchain: ${{ env.RUST_VERSION }}
           components: rustfmt
+          # The action defaults RUSTFLAGS to `-D warnings`, which is right for a
+          # lint job and wrong for this one. The toolchain here is pinned to
+          # 1.75 for the sciter ABI, and the source is written for a newer
+          # compiler: `#[allow(static_mut_refs)]` names a lint 1.75 does not
+          # have, so `unknown_lints` fires, and `redundant_imports` differs by
+          # version. Denying warnings turns both into a failed build of code
+          # that is not wrong.
+          #
+          # Lints belong to `ci.yml`, which runs them on stable where the lint
+          # set matches what the source expects. This job builds.
+          rustflags: ""
 
       # By hand, for the same reason as ui.yml: subosito/flutter-action calls
       # actions/cache@v5 internally and this organization requires full-SHA
