@@ -1,4 +1,4 @@
-use crate::{common::do_check_software_update, hbbs_http::create_http_client_with_url_strict};
+use crate::hbbs_http::create_http_client_with_url_strict;
 use hbb_common::{bail, config, log, ResultType};
 use std::{
     io::Write,
@@ -172,6 +172,13 @@ fn start_auto_update_check_(rx_msg: Receiver<UpdateMsg>) {
     }
 }
 
+// Everything after the early return below is dead, and was already dead
+// before it: SOFTWARE_UPDATE_URL has had no writer since the version-check
+// request was removed, so `update_url.is_empty()` was always true. The
+// return makes that structural; the allow is what lets the compiler agree
+// without deleting cross-platform installer code that cannot be tested from
+// here. Removing the module outright is declared work, see AGENTS.md.
+#[allow(unreachable_code)]
 fn check_update(manually: bool) -> ResultType<()> {
     // On macOS, auto-update is handled by check_update_as_root() in the service process.
     // The shared check_update() path is only used for manual update checks from the GUI.
@@ -184,10 +191,12 @@ fn check_update(manually: bool) -> ResultType<()> {
     if !(manually || config::Config::get_bool_option(config::keys::OPTION_ALLOW_AUTO_UPDATE)) {
         return Ok(());
     }
-    if do_check_software_update().is_err() {
-        // ignore
-        return Ok(());
-    }
+    // There is no update source in this build. The query that used to set
+    // SOFTWARE_UPDATE_URL reported the host's OS, architecture and a device
+    // fingerprint to a third-party endpoint, and it is gone; without it the
+    // URL below is always empty and the download path below is unreachable.
+    // Returning here makes that structural instead of incidental.
+    return Ok(());
 
     let update_url = crate::common::SOFTWARE_UPDATE_URL.lock().unwrap().clone();
     if update_url.is_empty() {
@@ -531,6 +540,8 @@ pub fn start_auto_update_macos() {
     }
 }
 
+// Same as check_update: dead after the early return, and dead before it.
+#[allow(unreachable_code)]
 #[cfg(target_os = "macos")]
 pub fn check_update_as_root() -> ResultType<bool> {
     let _update_lock = acquire_mac_update_lock()?;
@@ -577,9 +588,11 @@ pub fn check_update_as_root() -> ResultType<bool> {
             }
         }
     }
-    if let Err(e) = do_check_software_update() {
-        bail!("[root-update] Failed to check for software update: {}", e);
-    }
+    // Same as above: no update source, so nothing to check and nothing to
+    // download. This is the privileged path, which makes it the one that most
+    // deserves to be unreachable rather than merely unused.
+    return Ok(false);
+
     let update_url = crate::common::SOFTWARE_UPDATE_URL.lock().unwrap().clone();
     if update_url.is_empty() {
         log::info!("[root-update] No update available.");

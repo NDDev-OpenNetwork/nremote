@@ -1745,7 +1745,8 @@ pub fn main_get_last_remote_id() -> String {
 }
 
 pub fn main_get_software_update_url() {
-    crate::common::check_software_update();
+    // Kept as a no-op rather than removed: the Dart bindings are generated
+    // against this signature. There is no update source in this build.
 }
 
 pub fn main_get_home_dir() -> String {
