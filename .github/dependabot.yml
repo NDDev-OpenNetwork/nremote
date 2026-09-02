@@ -1,0 +1,54 @@
+version: 2
+updates:
+  # Three cargo entries, because there are three lockfiles. `libs/portable` and
+  # `libs/virtual_display` resolve independently of the workspace root, so an
+  # update to one says nothing about the others.
+  - package-ecosystem: cargo
+    directories:
+      - /
+      - /libs/portable
+      - /libs/virtual_display
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "chore(deps)"
+    # A version published minutes ago has been reviewed by nobody. The cooldown
+    # is the cheapest defence against a compromised release being pulled in
+    # before anyone has looked at it, and costs only a few days of latency on
+    # updates that were never urgent.
+    #
+    # The limit is 10 rather than 5 because this lockfile carries a real
+    # backlog: it was imported, not grown here, and the alerts have fixes. A
+    # low limit would ration the thing that is closing it.
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
+
+  # Every reusable workflow is pinned to a commit rather than a tag, which is
+  # what stops a moved tag changing what runs -- and equally why nothing
+  # refreshes those pins on its own.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(ci)"
+    # Only `default-days`: Dependabot rejects `semver-major-days` for this
+    # ecosystem, which has no semver-major notion in its cooldown model.
+    cooldown:
+      default-days: 7
+
+  # The user interface is 357 files of Dart and its dependencies were never
+  # under review here at all.
+  - package-ecosystem: pub
+    directory: /flutter
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    cooldown:
+      default-days: 7
+      semver-major-days: 14
