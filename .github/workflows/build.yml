@@ -36,9 +36,17 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # 1.75, and not a newer toolchain by preference: the sciter binding breaks on
-  # the i128 ABI change in 1.78, and the whole workspace shares one toolchain.
-  RUST_VERSION: "1.75"
+  # Upstream pins 1.75 because the sciter binding stops working on the i128 ABI
+  # change in 1.78. That constraint is about sciter at run time, and this
+  # product ships the Flutter interface on every platform it builds: the sciter
+  # UI is never started, and its library is loaded dynamically or not at all.
+  #
+  # Staying on 1.75 has a cost that does bind. Cargo 1.75 cannot parse a
+  # manifest that declares edition 2024, so it fails while downloading rather
+  # than while compiling, and every dependency that has moved to that edition
+  # becomes unacceptable - including security updates. That is what closed
+  # three dependency pull requests here on 2026-09-02.
+  RUST_VERSION: "1.98"
   FLUTTER_VERSION: "3.24.5"
   FLUTTER_SHA256: "a7c82f551a9eae018e078f6bb186171e5a77920d35a3d75a61d9a593d0a9e4ae"
   FLUTTER_MACOS_ARM64_SHA256: "ca9624a6de7a1a8962f2f0a3e2a57b16434ca34f1137b8d9dc68c5ca1f187133"
