@@ -1,0 +1,94 @@
+name: security
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  schedule:
+    # Weekly, so an advisory published after the last push is still seen.
+    - cron: '23 5 * * 3'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  codeql:
+    name: codeql
+    permissions:
+      actions: read # CodeQL reads the workflow definitions it analyses
+      contents: read
+      security-events: write # CodeQL publishes its findings to code scanning
+    uses: NDDev-OpenNetwork/ci-workflows/.github/workflows/public-codeql.yml@1ab6708b62ec7bd17f2d8a519c6fcc39edb22243
+    with:
+      # Actions only, and both absences are stated rather than implied.
+      #
+      # Rust needs a full build of an application that wants vcpkg, a Flutter
+      # SDK and a long list of system libraries; that belongs with build.yml and
+      # arrives with it.
+      #
+      # JavaScript was listed here and failed with "CodeQL could not process any
+      # code written in JavaScript/TypeScript", which is correct: the web client
+      # is not in this tree. The user interface is Dart, and CodeQL has no Dart
+      # extractor at all -- so the largest surface in this repository is not
+      # analysed by anything, and no configuration here changes that.
+      languages: '["actions"]'
+      queries: security-and-quality
+
+  dependency-review:
+    name: dependency-review
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      pull-requests: write # writes the review it produces
+    uses: NDDev-OpenNetwork/ci-workflows/.github/workflows/public-dependency-review.yml@1ab6708b62ec7bd17f2d8a519c6fcc39edb22243
+    with:
+      fail_on_severity: moderate
+
+  scorecard:
+    name: scorecard
+    if: github.event_name != 'pull_request'
+    permissions:
+      actions: read # Scorecard reads workflow definitions
+      contents: read
+      id-token: write # mints the OIDC token its publication is signed with
+      security-events: write # Scorecard publishes its findings to code scanning
+    uses: NDDev-OpenNetwork/ci-workflows/.github/workflows/public-scorecard.yml@1ab6708b62ec7bd17f2d8a519c6fcc39edb22243
+
+  # There is no `osv` job, and the absence is the honest answer rather than an
+  # oversight.
+  #
+  # This workspace has exactly one lockfile -- `libs/hbb_common` is a workspace
+  # member, not an independent crate -- and it carries 82 advisories, measured
+  # 2026-09-02. An earlier version of this workflow scanned a
+  # `libs/hbb_common/Cargo.lock` that does not exist in the repository: it
+  # existed only on the machine where cargo had been run inside that directory
+  # in isolation, which resolves a different graph. That would have been a gate
+  # over a file nobody has, reporting green.
+  #
+  # Clearing the real backlog means updating a lockfile for a Rust-plus-Flutter
+  # application that this repository cannot yet build in CI, and an update
+  # nothing compiles is a change nobody can vouch for. `dependency-review` above
+  # holds the line meanwhile: it fails on anything vulnerable a pull request
+  # *introduces*, which is the ratchet that matters while the backlog waits for
+  # a build to verify against. AGENTS.md carries the count and the date.
+
+
+  zizmor:
+    name: zizmor
+    permissions:
+      actions: read # the SARIF upload reads this run to attach its results
+      contents: read
+      security-events: write # zizmor publishes its findings to code scanning
+    uses: NDDev-OpenNetwork/ci-workflows/.github/workflows/zizmor-sarif.yml@1ab6708b62ec7bd17f2d8a519c6fcc39edb22243
+
+  secret-scan:
+    name: secret-scan
+    permissions:
+      contents: read
+    uses: NDDev-OpenNetwork/ci-workflows/.github/workflows/secret-scan.yml@1ab6708b62ec7bd17f2d8a519c6fcc39edb22243

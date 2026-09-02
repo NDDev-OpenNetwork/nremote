@@ -1,4 +1,4 @@
-use crate::{common::do_check_software_update, hbbs_http::create_http_client_with_url_strict};
+use crate::hbbs_http::create_http_client_with_url_strict;
 use hbb_common::{bail, config, log, ResultType};
 use std::{
     io::Write,
@@ -24,7 +24,7 @@ struct MacUpdateLock {
 
 #[cfg(target_os = "macos")]
 fn acquire_mac_update_lock() -> ResultType<MacUpdateLock> {
-    let path = std::path::PathBuf::from("/var/run/rustdesk-update.lock");
+    let path = std::path::PathBuf::from("/var/run/nremote-update.lock");
     let handle = std::fs::OpenOptions::new()
         .read(true)
         .write(true)
@@ -172,6 +172,13 @@ fn start_auto_update_check_(rx_msg: Receiver<UpdateMsg>) {
     }
 }
 
+// Everything after the early return below is dead, and was already dead
+// before it: SOFTWARE_UPDATE_URL has had no writer since the version-check
+// request was removed, so `update_url.is_empty()` was always true. The
+// return makes that structural; the allow is what lets the compiler agree
+// without deleting cross-platform installer code that cannot be tested from
+// here. Removing the module outright is declared work, see AGENTS.md.
+#[allow(unreachable_code)]
 fn check_update(manually: bool) -> ResultType<()> {
     // On macOS, auto-update is handled by check_update_as_root() in the service process.
     // The shared check_update() path is only used for manual update checks from the GUI.
@@ -184,10 +191,12 @@ fn check_update(manually: bool) -> ResultType<()> {
     if !(manually || config::Config::get_bool_option(config::keys::OPTION_ALLOW_AUTO_UPDATE)) {
         return Ok(());
     }
-    if do_check_software_update().is_err() {
-        // ignore
-        return Ok(());
-    }
+    // There is no update source in this build. The query that used to set
+    // SOFTWARE_UPDATE_URL reported the host's OS, architecture and a device
+    // fingerprint to a third-party endpoint, and it is gone; without it the
+    // URL below is always empty and the download path below is unreachable.
+    // Returning here makes that structural instead of incidental.
+    return Ok(());
 
     let update_url = crate::common::SOFTWARE_UPDATE_URL.lock().unwrap().clone();
     if update_url.is_empty() {
@@ -204,14 +213,14 @@ fn check_update(manually: bool) -> ResultType<()> {
                 );
             };
             format!(
-                "{}/rustdesk-{}-{}.{}",
+                "{}/nremote-{}-{}.{}",
                 download_url,
                 version,
                 arch,
                 if update_msi { "msi" } else { "exe" }
             )
         } else {
-            format!("{}/rustdesk-{}-x86-sciter.exe", download_url, version)
+            format!("{}/nremote-{}-x86-sciter.exe", download_url, version)
         };
         log::debug!("New version available: {}", &version);
         let client = create_http_client_with_url_strict(&download_url)?;
@@ -375,8 +384,8 @@ pub fn get_update_download_file_from_url(url: &str) -> Option<PathBuf> {
     let tag = segments.next()?;
     let filename = segments.next()?;
 
-    if owner != "rustdesk"
-        || repo != "rustdesk"
+    if owner != "nremote"
+        || repo != "nremote"
         || releases != "releases"
         || download != "download"
         || tag.is_empty()
@@ -455,7 +464,7 @@ pub fn has_no_active_conns_ipc() -> bool {
 
 #[cfg(target_os = "macos")]
 fn wait_for_failed_update_retry() {
-    const FAILURE_MARKER: &str = "/var/root/.rustdeskupdate_failed";
+    const FAILURE_MARKER: &str = "/var/root/.nremoteupdate_failed";
     let marker = std::path::Path::new(FAILURE_MARKER);
     if !marker.exists() {
         return;
@@ -493,7 +502,7 @@ fn wait_for_failed_update_retry() {
 #[cfg(target_os = "macos")]
 pub fn start_auto_update_macos() {
     let spawn_result = std::thread::Builder::new()
-        .name("rustdesk-auto-update".to_owned())
+        .name("nremote-auto-update".to_owned())
         .spawn(|| {
             log::info!("[root-update] Auto-update scheduler thread started.");
             std::thread::sleep(INITIAL_CHECK_DELAY);
@@ -531,6 +540,8 @@ pub fn start_auto_update_macos() {
     }
 }
 
+// Same as check_update: dead after the early return, and dead before it.
+#[allow(unreachable_code)]
 #[cfg(target_os = "macos")]
 pub fn check_update_as_root() -> ResultType<bool> {
     let _update_lock = acquire_mac_update_lock()?;
@@ -551,8 +562,8 @@ pub fn check_update_as_root() -> ResultType<bool> {
         for entry in entries.flatten() {
             let name = entry.file_name();
             let name_str = name.to_string_lossy();
-            if name_str.starts_with(".rustdeskupdate-root-")
-                || name_str.starts_with(".rustdeskdownload-")
+            if name_str.starts_with(".nremoteupdate-root-")
+                || name_str.starts_with(".nremotedownload-")
             {
                 let path = entry.path();
                 let Ok(metadata) = std::fs::symlink_metadata(&path) else {
@@ -577,9 +588,11 @@ pub fn check_update_as_root() -> ResultType<bool> {
             }
         }
     }
-    if let Err(e) = do_check_software_update() {
-        bail!("[root-update] Failed to check for software update: {}", e);
-    }
+    // Same as above: no update source, so nothing to check and nothing to
+    // download. This is the privileged path, which makes it the one that most
+    // deserves to be unreachable rather than merely unused.
+    return Ok(false);
+
     let update_url = crate::common::SOFTWARE_UPDATE_URL.lock().unwrap().clone();
     if update_url.is_empty() {
         log::info!("[root-update] No update available.");
@@ -588,7 +601,7 @@ pub fn check_update_as_root() -> ResultType<bool> {
     let download_url = update_url.replace("tag", "download");
     let version = download_url.split('/').last().unwrap_or_default().to_string();
     let arch = if std::env::consts::ARCH == "aarch64" { "aarch64" } else { "x86_64" };
-    let dmg_url = format!("{}/rustdesk-{}-{}.dmg", download_url, version, arch);
+    let dmg_url = format!("{}/nremote-{}-{}.dmg", download_url, version, arch);
     log::info!("[root-update] New version: {}, downloading from {}", version, dmg_url);
     // Validate URL against GitHub release allowlist before downloading as root
     let Some(file_path_validated) = get_update_download_file_from_url(&dmg_url) else {
@@ -599,7 +612,7 @@ pub fn check_update_as_root() -> ResultType<bool> {
     // Use mktemp so a local user cannot pre-create a predictable path and
     // permanently deny updates for a reused service PID.
     let private_tmp_output = std::process::Command::new("/usr/bin/mktemp")
-        .args(["-d", "/tmp/.rustdeskdownload-XXXXXX"])
+        .args(["-d", "/tmp/.nremotedownload-XXXXXX"])
         .output()?;
     if !private_tmp_output.status.success() {
         bail!(
@@ -618,7 +631,7 @@ pub fn check_update_as_root() -> ResultType<bool> {
         use std::os::unix::fs::PermissionsExt;
         std::fs::set_permissions(&private_tmp, std::fs::Permissions::from_mode(0o700))?;
     }
-    let filename = dmg_url.split('/').last().unwrap_or("rustdesk.dmg");
+    let filename = dmg_url.split('/').last().unwrap_or("nremote.dmg");
     let file_path = std::path::PathBuf::from(format!("{}/{}", private_tmp, filename));
     let tmp_path = file_path.to_string_lossy().to_string();
     // Download
@@ -667,7 +680,7 @@ mod tests {
 
         assert_eq!(
             file.file_name().and_then(|name| name.to_str()),
-            Some("rustdesk-1.4.0-x86_64.dmg")
+            Some("nremote-1.4.0-x86_64.dmg")
         );
     }
 
@@ -675,13 +688,13 @@ mod tests {
     fn update_download_file_rejects_untrusted_or_malformed_urls() {
         for url in [
             "http://github.com/rustdesk/rustdesk/releases/download/1/rustdesk.exe",
-            "https://example.com/rustdesk.exe",
-            "https://github.com/other/project/releases/download/1/rustdesk.exe",
+            "https://example.com/nremote.exe",
+            "https://github.com/other/project/releases/download/1/nremote.exe",
             "https://github.com/rustdesk/rustdesk/releases/download/1/",
             "https://github.com/rustdesk/rustdesk/releases/download/1/nested/rustdesk.exe",
-            "https://github.com/rustdesk/rustdesk/releases/download/1/C:rustdesk.exe",
+            "https://github.com/rustdesk/rustdesk/releases/download/1/C:nremote.exe",
             "https://user@github.com/rustdesk/rustdesk/releases/download/1/rustdesk.exe",
-            "https://github.com:443/rustdesk/rustdesk/releases/download/1/rustdesk.exe",
+            "https://github.com:443/nremote/nremote/releases/download/1/nremote.exe",
             "https://github.com/rustdesk/rustdesk/releases/download/1/rustdesk.exe?download=1",
             "https://github.com/rustdesk/rustdesk/releases/download/1/rustdesk.exe#download",
             "not a url",

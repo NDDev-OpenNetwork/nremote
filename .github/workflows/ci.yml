@@ -1,250 +1,95 @@
-name: CI
+name: ci
 
-env:
-#   MIN_SUPPORTED_RUST_VERSION: "1.46.0"
-#   CICD_INTERMEDIATES_DIR: "_cicd-intermediates"
-  VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
-  # for multiarch gcc compatibility
-  VCPKG_COMMIT_ID: "9e593bb18ea69cc5095e012465dcd675a822ed0d"
+# What this proves is narrower than "the app works", and saying so is the point.
+#
+# The application is Rust plus Flutter across three operating systems, and a
+# full build of it belongs in `build.yml`. This workflow proves the things that
+# are true of the source regardless of platform, and it proves them on every
+# pull request in under a few minutes: that the product identity has not
+# reverted, that the server configuration is still absent from a public
+# repository, that the wire protocol still matches the server's, and that the
+# shared library compiles clean.
 
 on:
-  workflow_dispatch:
   pull_request:
-    paths-ignore:
-      - "docs/**"
-      - "README.md"
+    branches: [main]
   push:
-    branches:
-      - master
-    paths-ignore:
-      - ".github/**"
-      - "docs/**"
-      - "README.md"
-      - "res/**"
-      - "appimage/**"
-      - "flatpak/**"
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  # ensure_cargo_fmt:
-  #   name: Ensure 'cargo fmt' has been run
-  #   runs-on: ubuntu-20.04
-  #   steps:
-  #   - uses: actions-rs/toolchain@16499b5e05bf2e26879000db0c1d13f7e13fa3af # v1
-  #     with:
-  #       toolchain: stable
-  #       default: true
-  #       profile: minimal
-  #       components: rustfmt
-  #   - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
-  #   - run: cargo fmt -- --check
-
-  # min_version:
-  #   name: Minimum supported rust version
-  #   runs-on: ubuntu-20.04
-  #   steps:
-  #   - name: Checkout source code
-  #     uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3
-  #     with:
-  #       submodules: recursive
-
-  #   - name: Install rust toolchain (v${{ env.MIN_SUPPORTED_RUST_VERSION }})
-  #     uses: actions-rs/toolchain@16499b5e05bf2e26879000db0c1d13f7e13fa3af # v1
-  #     with:
-  #       toolchain: ${{ env.MIN_SUPPORTED_RUST_VERSION }}
-  #       default: true
-  #       profile: minimal # minimal component installation (ie, no documentation)
-  #       components: clippy
-  #   - name: Run clippy (on minimum supported rust version to prevent warnings we can't fix)
-  #     uses: actions-rs/cargo@844f36862e911db73fe0815f00a4a2602c279505 # v1
-  #     with:
-  #       command: clippy
-  #       args: --locked --all-targets --all-features -- --allow clippy::unknown_clippy_lints
-  #   - name: Run tests
-  #     uses: actions-rs/cargo@844f36862e911db73fe0815f00a4a2602c279505 # v1
-  #     with:
-  #       command: test
-  #       args: --locked
-
-  build:
-    name: ${{ matrix.job.target }} (${{ matrix.job.os }})
-    runs-on: ${{ matrix.job.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        job:
-          # - { target: aarch64-unknown-linux-gnu   , os: ubuntu-20.04, use-cross: true }
-          # - { target: arm-unknown-linux-gnueabihf , os: ubuntu-20.04, use-cross: true }
-          # - { target: arm-unknown-linux-musleabihf, os: ubuntu-20.04, use-cross: true }
-          # - { target: i686-pc-windows-msvc        , os: windows-2022                  }
-          # - { target: i686-unknown-linux-gnu      , os: ubuntu-20.04, use-cross: true }
-          # - { target: i686-unknown-linux-musl     , os: ubuntu-20.04, use-cross: true }
-          # - { target: x86_64-apple-darwin         , os: macos-10.15                   }
-          # - { target: x86_64-pc-windows-gnu       , os: windows-2022                  }
-          # - { target: x86_64-pc-windows-msvc      , os: windows-2022                  }
-          # - { target: aarch64-pc-windows-msvc     , os: windows-11-arm                }
-          - { target: x86_64-unknown-linux-gnu    , os: ubuntu-24.04                  }
-          # - { target: x86_64-unknown-linux-musl   , os: ubuntu-20.04, use-cross: true }
+  contracts:
+    name: contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
     steps:
-    - name: Free Disk Space (Ubuntu)
-      if: runner.os == 'Linux'
-      # jlumbroso/free-disk-space@v1.3.1 is used in .github\workflows\flutter-build.yml
-      # But pinning to a specific version to avoid unexpected issues is preferred.
-      uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
-      with:
-        tool-cache: false
-        android: true
-        dotnet: true
-        haskell: true
-        large-packages: false
-        docker-images: true
-        swap-storage: false
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
 
-    - name: Export GitHub Actions cache environment variables
-      uses: actions/github-script@d7906e4ad0b1822421a7e6a35d5ca353c962f410 # v6
-      with:
-        script: |
-          core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
-          core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+      # An upstream merge that reintroduces the prior name would otherwise land
+      # silently: nothing about it breaks a build. This is the gate that makes
+      # re-running the rename tool part of merging rather than something to
+      # remember.
+      - name: The product identity has not reverted
+        run: python3 scripts/brand.py --check
 
-    - name: Checkout source code
-      uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-      with:
-        submodules: recursive
+      # The address of a private deployment must not be committed to a public
+      # repository. The constants are supposed to be empty here, and the build
+      # supplies them; a commit that fills them in is a leak, not a shortcut.
+      - name: No server configuration is committed
+        run: |
+          set -euo pipefail
+          python3 scripts/configure.py --check | tee /tmp/configured.txt
+          if ! grep -qx 'RENDEZVOUS_SERVERS = &\[\]' /tmp/configured.txt; then
+            echo "a rendezvous server is compiled into this repository" >&2
+            exit 1
+          fi
+          if ! grep -qx 'RS_PUB_KEY         = (empty)' /tmp/configured.txt; then
+            echo "a server public key is compiled into this repository" >&2
+            exit 1
+          fi
 
-    - name: Install prerequisites
-      shell: bash
-      run: |
-        case ${{ matrix.job.target }} in
-          x86_64-unknown-linux-gnu)
-            sudo apt-get -y update
-            sudo apt-get install -y \
-               clang \
-               cmake \
-               curl \
-               gcc \
-               git \
-               g++ \
-               libasound2-dev \
-               libunwind-dev \
-               libgstreamer1.0-dev \
-               libgstreamer-plugins-base1.0-dev \
-               libgtk-3-dev \
-               libpulse-dev \
-               libva-dev \
-               libvdpau-dev \
-               libxcb-randr0-dev \
-               libxcb-shape0-dev \
-               libxcb-xfixes0-dev \
-               libxdo-dev \
-               libxfixes-dev \
-               nasm \
-               wget
-            ;;
-          # arm-unknown-linux-*) sudo apt-get -y update ; sudo apt-get -y install gcc-arm-linux-gnueabihf ;;
-          # aarch64-unknown-linux-gnu) sudo apt-get -y update ; sudo apt-get -y install gcc-aarch64-linux-gnu ;;
-        esac
+      # Checks this repository's copy against the pin, and the server's copy at
+      # its pinned release against the same pin. The second half is the one that
+      # catches a divergence introduced on the other side.
+      - name: The wire protocol still matches the server
+        run: python3 scripts/check_protocol_parity.py
 
-    - name: Setup vcpkg with Github Actions binary cache
-      uses: lukka/run-vcpkg@b1a0dd252f06b9e25b3c022a9a03bd7a427fb6a2 # v11
-      with:
-        vcpkgDirectory: /opt/artifacts/vcpkg
-        vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
+  shared-library:
+    name: shared-library
+    permissions:
+      contents: read
+    uses: NDDev-OpenNetwork/ci-workflows/.github/workflows/rust-ci.yml@1ab6708b62ec7bd17f2d8a519c6fcc39edb22243
+    with:
+      working_directory: libs/hbb_common
+      test_matrix_os: '["ubuntu-latest", "macos-latest"]'
+      build_command: 'cargo build --locked --all-targets'
+      test_command: 'cargo test --locked --all-targets'
+      clippy_command: ''
+      fmt_command: ''
 
-    - name: Install vcpkg dependencies
-      run: |
-        $VCPKG_ROOT/vcpkg install --x-install-root="$VCPKG_ROOT/installed"
-      shell: bash
+  actionlint:
+    name: actionlint
+    permissions:
+      contents: read
+    uses: NDDev-OpenNetwork/ci-workflows/.github/workflows/actionlint.yml@1ab6708b62ec7bd17f2d8a519c6fcc39edb22243
 
-    - name: Install Rust toolchain
-      uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # v1
-      with:
-        toolchain: stable
-        targets: ${{ matrix.job.target }}
-        components: ''
-
-    - name: Show version information (Rust, cargo, GCC)
-      shell: bash
-      run: |
-        gcc --version || true
-        rustup -V
-        rustup toolchain list
-        rustup default
-        cargo -V
-        rustc -V
-
-    - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
-
-    - name: Build
-      uses: actions-rs/cargo@844f36862e911db73fe0815f00a4a2602c279505 # v1
-      with:
-        use-cross: ${{ matrix.job.use-cross }}
-        command: build
-        args: --locked --target=${{ matrix.job.target }}
-
-    - name: clean
-      shell: bash
-      run: |
-        cargo clean
-
-    # - name: Strip debug information from executable
-    #   id: strip
-    #   shell: bash
-    #   run: |
-    #     # Figure out suffix of binary
-    #     EXE_suffix=""
-    #     case ${{ matrix.job.target }} in
-    #       *-pc-windows-*) EXE_suffix=".exe" ;;
-    #     esac;
-
-    #     # Figure out what strip tool to use if any
-    #     STRIP="strip"
-    #     case ${{ matrix.job.target }} in
-    #       arm-unknown-linux-*) STRIP="arm-linux-gnueabihf-strip" ;;
-    #       aarch64-unknown-linux-gnu) STRIP="aarch64-linux-gnu-strip" ;;
-    #       *-pc-windows-msvc) STRIP="" ;;
-    #     esac;
-
-    #     # Setup paths
-    #     BIN_DIR="${{ env.CICD_INTERMEDIATES_DIR }}/stripped-release-bin/"
-    #     mkdir -p "${BIN_DIR}"
-    #     BIN_NAME="${{ env.PROJECT_NAME }}${EXE_suffix}"
-    #     BIN_PATH="${BIN_DIR}/${BIN_NAME}"
-
-    #     # Copy the release build binary to the result location
-    #     cp "target/${{ matrix.job.target }}/release/${BIN_NAME}" "${BIN_DIR}"
-
-    #     # Also strip if possible
-    #     if [ -n "${STRIP}" ]; then
-    #       "${STRIP}" "${BIN_PATH}"
-    #     fi
-
-    #     # Let subsequent steps know where to find the (stripped) bin
-    #     echo ::set-output name=BIN_PATH::${BIN_PATH}
-    #     echo ::set-output name=BIN_NAME::${BIN_NAME}
-
-    - name: Set testing options
-      id: test-options
-      shell: bash
-      run: |
-        # test only library unit tests and binary for arm-type targets
-        unset CARGO_TEST_OPTIONS
-
-        case ${{ matrix.job.target }} in
-          arm-* | aarch64-*)
-            CARGO_TEST_OPTIONS="--lib --bin ${PROJECT_NAME}"
-            ;;
-          *)
-            CARGO_TEST_OPTIONS="--workspace --no-fail-fast -- --skip test_get_cursor_pos --skip test_get_key_state"
-            ;;
-        esac;
-
-        #deprecated echo ::set-output name=CARGO_TEST_OPTIONS::${CARGO_TEST_OPTIONS}
-        echo "CARGO_TEST_OPTIONS=${CARGO_TEST_OPTIONS}" >> $GITHUB_ENV
-        echo "CARGO_TEST_OPTIONS=${CARGO_TEST_OPTIONS}" >> $GITHUB_OUTPUT
-
-    - name: Run tests
-      uses: actions-rs/cargo@844f36862e911db73fe0815f00a4a2602c279505 # v1
-      with:
-        use-cross: ${{ matrix.job.use-cross }}
-        command: test
-        args: --locked --target=${{ matrix.job.target }} ${{ steps.test-options.outputs.CARGO_TEST_OPTIONS}}
+  pr-hygiene:
+    name: pr-hygiene
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      issues: write # the stale bot closes threads
+      pull-requests: write # the labeler applies labels
+    uses: NDDev-OpenNetwork/ci-workflows/.github/workflows/pr-hygiene.yml@1ab6708b62ec7bd17f2d8a519c6fcc39edb22243

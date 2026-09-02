@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=NRemote
+NoDisplay=true
+MimeType=x-scheme-handler/nremote;
+TryExec=nremote
+Exec=nremote %u
+Icon=nremote
+Terminal=false
+Type=Application
+StartupNotify=false
+StartupWMClass=nremote

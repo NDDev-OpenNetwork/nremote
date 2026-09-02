@@ -1,0 +1,54 @@
+# Gitleaks configuration for nremote.
+#
+# The scan reads the whole ref history, and this history is imported. Nine
+# distinct values are matched; every one is named below with what it is. The
+# allowlists are anchored on the value, never on a path: allowing `src/lang/`
+# would blind the scan to a real credential pasted into a translation file
+# tomorrow, while allowing one literal that already exists cannot hide anything
+# that has not happened yet.
+#
+# One of them was also fixed rather than only allowed. The prior work's public
+# server key appeared 81 times in the current tree, inside a help tip showing an
+# example connection string, translated into 42 languages. `scripts/brand.py`
+# replaces it with `<your-server-key>` -- a placeholder, deliberately, because
+# the first attempt used a realistic-looking base64 string and a scanner cannot
+# tell one of those from a credential. The allowlist below covers the 92
+# historical commits that still carry the original, which cannot be edited
+# without discarding the provenance of every commit under them.
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "The prior work's published example server key, in translated UI help text"
+regexTarget = "secret"
+regexes = ['''^5Qbwsde3unUcJBtrx9ZkvUmwFNoExHzpryHuPUdqlWM=''']
+
+[[allowlists]]
+description = "Test fixture in custom_server.rs and license.rs; base64 of \"foobar.,2\""
+regexTarget = "secret"
+regexes = ['''^Zm9vYmFyLiwyCg==''']
+
+[[allowlists]]
+description = """
+Google API keys from the prior work's Firebase project, in web/index.html,
+flutter/web/index.html and an Android google-services.json. None of those paths
+exists in this tree; they are reachable only through history. A Google API key
+in a client bundle is client configuration rather than a credential -- it
+identifies a project, and access is controlled by restrictions on the key -- and
+this is somebody else's project, which is why the files are gone rather than
+carried forward.
+"""
+regexTarget = "secret"
+regexes = [
+  '''^AIzaSyCgehIZk1aFP0E7wZtYRRqrfvNiNAF39-A$''',
+  '''^AIzaSyAPOsKcXjrAR-7Z148sYr_gdB_JQZkamTM$''',
+]
+
+[[allowlists]]
+description = "libsodium symbol names in a minified bundle, in a path this tree does not have"
+regexTarget = "secret"
+regexes = [
+  '''^crypto_aead_chacha20poly1305_keygen$''',
+  '''^crypto_kdf_blake2b_BYTES_MAX$''',
+]

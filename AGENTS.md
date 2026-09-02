@@ -1,112 +1,111 @@
-# RustDesk Guide
+# AGENTS.md — nremote
 
-## Project Layout
+## What this is
 
-### Directory Structure
-* `src/` Rust app
-* `src/server/` audio / clipboard / input / video / network
-* `src/platform/` platform-specific code
-* `src/ui/` legacy Sciter UI (deprecated)
-* `flutter/` current UI
-* `libs/hbb_common/` config / proto / shared utils
-* `libs/scrap/` screen capture
-* `libs/enigo/` input control
-* `libs/clipboard/` clipboard
-* `libs/hbb_common/src/config.rs` all options
+The remote desktop client for [nremote-server](https://github.com/NDDev-OpenNetwork/nremote-server).
+Public, AGPL-3.0, part of `NDDev-OpenNetwork`. `NOTICE` records the prior work
+this is derived from and every modification since; add to that list when you
+make one that belongs there.
 
-### Key Components
-- **Remote Desktop Protocol**: Custom protocol implemented in `src/rendezvous_mediator.rs` for communicating with rustdesk-server
-- **Screen Capture**: Platform-specific screen capture in `libs/scrap/`
-- **Input Handling**: Cross-platform input simulation in `libs/enigo/`
-- **Audio/Video Services**: Real-time audio/video streaming in `src/server/`
-- **File Transfer**: Secure file transfer implementation in `libs/hbb_common/`
+## Three invariants, and each has a gate
 
-### UI Architecture
-- **Legacy UI**: Sciter-based (deprecated) - files in `src/ui/`
-- **Modern UI**: Flutter-based - files in `flutter/`
-  - Desktop: `flutter/lib/desktop/`
-  - Mobile: `flutter/lib/mobile/`
-  - Shared: `flutter/lib/common/` and `flutter/lib/models/`
+**No outbound call the operator did not ask for.** No update check, no
+telemetry, no fingerprint, no default API server. If a change needs to contact
+a host the operator did not configure, that is a change in what the product is:
+it is opt-in, logged, and written into NOTICE. Nothing currently gates this
+automatically — it is a rule, and reviewing a diff for a new HTTP client is
+part of reviewing a diff.
 
-## Rust Rules
+**The product identity does not revert.** `scripts/brand.py --check` runs in
+CI. An upstream merge that reintroduces the prior name breaks nothing at build
+time, which is exactly why it needs a gate. Re-run `scripts/brand.py` as part
+of merging, then read the diff.
 
-* Avoid `unwrap()` / `expect()` in production code.
-* Exceptions:
+The tool masks dependency source addresses — twenty git dependencies resolve
+from `github.com/rustdesk-org/…` — and rewrites product links through an
+explicit table. Do not widen the mask to "any URL containing the name": that
+was the first version, and it preserved the "Website", "Download" and "Privacy
+Statement" links in the user interface, which is branding wearing a URL's
+clothes.
 
-  * tests;
-  * lock acquisition where failure means poisoning, not normal control flow.
-* Otherwise prefer `Result` + `?` or explicit handling.
-* Do not ignore errors silently.
-* Avoid unnecessary `.clone()`.
-* Prefer borrowing when practical.
-* Do not add dependencies unless needed.
-* Keep code simple and idiomatic.
+**The wire protocol matches the server.** `scripts/check_protocol_parity.py`
+pins `libs/hbb_common/protos/rendezvous.proto` by digest and checks it twice:
+against this repository, and against `nremote-server` at its pinned release.
+The second half is the one that catches a divergence introduced on the other
+side. A protocol change moves both repositories and updates the pin in the same
+breath. A field renamed on one side alone produces a client that connects, a
+server that listens, and a device that never registers — with no error
+anywhere.
 
-## Tokio Rules
+## No server configuration in this repository
 
-* Assume a Tokio runtime already exists.
-* Never create nested runtimes.
-* Never call `Runtime::block_on()` inside Tokio / async code.
-* Do not hide runtime creation inside helpers or libraries.
-* Do not hold locks across `.await`.
-* Prefer `.await`, `tokio::spawn`, channels.
-* Use `spawn_blocking` or dedicated threads for blocking work.
-* Do not use `std::thread::sleep()` in async code.
+`RENDEZVOUS_SERVERS` and `RS_PUB_KEY` are empty here and CI fails if they are
+not. This repository is public; a deployment's address is a fact about a
+private estate. Neither value is secret — every client needs both — but "not
+secret" and "belongs in a public repository" are different questions.
 
-## Editing Hygiene
+The build supplies them through `scripts/configure.py`, which validates that
+the key is 32 bytes of base64 and the host is a host rather than a URL.
 
-* Change only what is required.
-* Prefer the smallest valid diff.
-* Do not refactor unrelated code.
-* Do not make formatting-only changes.
-* Keep naming/style consistent with nearby code.
+## libs/hbb_common is vendored, not a dependency
 
-### Comments
+It arrived as a submodule and is now part of this tree, because branding and
+the telemetry removal both need to change files inside it and a consuming
+repository cannot commit into a submodule.
 
-* Avoid comments unless they explain a non-obvious reason, constraint, or workaround.
-* Never restate what the code does; prefer clearer code instead.
-* If the code is self-explanatory, add no comment.
+`nremote-server` vendors the same library at an earlier upstream commit. Two
+copies is a liability with one thing it must never touch, and that thing has
+the parity check above. Consolidating them into a third repository both
+consume is the right end state and is declared work, not a habit.
 
-### Be minimally invasive
+Upstream changes to that directory are merged by hand. There is no gitlink to
+bump.
 
-* Prefer purely additive changes: layer new (`#[cfg]`-gated) blocks or new functions around existing code instead of restructuring it. The ideal diff for a fix adds lines and modifies/deletes none.
-* Do not extract or reshape existing code just to enable your new code; look for a mechanism that leaves existing lines untouched (e.g. hide/show an existing object instead of refactoring its construction into a helper for rebuilding).
-* Accept a little duplication over a restructure. A new function that repeats a few lines of an existing one is a better diff than reshaping the original so both can share it.
-* Put new logic in self-contained functions in the module it belongs to (platform-specific logic in `src/platform/`, with `use` inside the function body to avoid churning shared import blocks). Call sites in shared files (`src/tray.rs`, `src/core_main.rs`, `src/server/connection.rs`, …) should be thin one-line hooks.
+## Open work, named rather than implied
 
-## Reviewing a PR
+- **The auto-updater module.** Its network path is dead — the request that set
+  `SOFTWARE_UPDATE_URL` is gone, so the download can never start — and the two
+  entry points return before it. What remains is several hundred lines of
+  Windows and macOS installer code behind `#[allow(unreachable_code)]`.
+  Deleting it is right and is a change that needs a macOS and Windows build to
+  believe, which is why it is not folded into the commit that disabled it.
+- **A shared `nremote-common`.** See above.
+- **82 advisories in the application lockfile.** Measured 2026-09-02 with
+  osv-scanner over `Cargo.lock`; many have fixes available. There is one
+  lockfile — `libs/hbb_common` is a workspace member, not an independent crate
+  — so there is nothing smaller to scan honestly. They are not addressed
+  because there is no build in CI to verify an update against, and a lockfile
+  update nothing compiles is a change nobody can vouch for. `security.yml`
+  therefore has no `osv` job and says why in its place; `dependency-review`
+  holds the line against anything a pull request introduces. The build workflow
+  is what unblocks this.
+- **A full application build in CI.** `ci.yml` proves what is true of the
+  source on any platform. The three-platform build is `build.yml`'s job.
 
-* Review only what the diff introduces. Verify ownership with `gh pr diff` before reporting a finding — if the offending lines are untouched context, it is a pre-existing problem, not this PR's.
-* List pre-existing problems in a separate section at the end, or leave out the ones that are not fatal. Never mix them into the findings the author has to fix.
-* Before re-reviewing, read the author's reply comments. Do not re-raise items they declined on scope grounds.
-* State a finding's consequence exactly: distinguish "the value is lost" from "the shortcut is inert but the value still saves".
+- **The user interface is not statically analysed.** CodeQL has no Dart
+  extractor, and `flutter/` is 357 of this repository's files. `dart analyze`
+  is the tool that exists for it and is not wired up; that is a gap with a
+  name, not a decision.
 
-## Localization (`src/lang/*.rs`)
+## Verification
 
-Each file is a `HashMap<key, translation>`. Layout:
+```bash
+python3 scripts/brand.py --check
+python3 scripts/configure.py --check
+python3 scripts/check_protocol_parity.py
+cargo test --locked --all-targets --manifest-path libs/hbb_common/Cargo.toml
+```
 
-* `template.rs` is the master list of every key. **Never edit it** as part of translation work.
-* `en.rs` holds only the keys whose English display text differs from the key itself.
-* Every other file (`de.rs`, `fr.rs`, …) carries the full key set; an untranslated entry has an empty value: `("key", "")`.
+## CI
 
-### Finding the English source for a key
+Every reusable call is pinned to `NDDev-OpenNetwork/ci-workflows` by full SHA
+and runs on GitHub-hosted runners. That is a rule, not a fallback: a public
+repository must never reach private self-hosted capacity, and public standard
+runners are unmetered.
 
-When filling an empty entry, determine the source English text with this rule:
+## Governance
 
-* If `key` exists in `en.rs` **with a non-empty value**, that value is the source text (look it up in `en.rs`).
-* Otherwise the **key string itself is the source text** (the key is already plain English).
-
-Then translate that source into the file's target language (infer the language from the file's existing non-empty entries / filename).
-
-### Translation hygiene
-
-* Only fill empty values. Never change keys, and never touch existing non-empty translations.
-* Preserve placeholders (`{}`) and escape sequences (`\n`, `\"`) exactly as in the source.
-* Do not translate brand or technical tokens: `RustDesk`, `Socks5`, `TLS`, `UAC`, `Wayland`, `X11`, `TCP`, `UDP`, `2FA`, `RDP`, `D3D`, etc.
-* Copy URL values (e.g. `doc_*` keys) verbatim from `en.rs`.
-
-### Adding new keys (feature work)
-
-* New English-text keys use sentence case, not Title Case: `Use ID whitelisting`, **not** `Use ID Whitelisting`. Acronyms (ID, IP, 2FA…) stay uppercase. Legacy Title-Case keys (e.g. `Use IP Whitelisting`) stay as-is — do not rename them.
-* Since the key itself is the English display text, a sentence-case key usually needs **no** `en.rs` entry; add one only when the display text must differ from the key (e.g. `*_tip` keys).
-* Append each new key to `template.rs` (with `""`) and to every `src/lang/*.rs` file (translated, or `""` if unsure), at the end of the list.
+`.gds/repository.yaml` declares this repository's identity, portfolio, policy
+profiles and required verification commands. It is the source; anything under
+`.gds/` carrying a `GENERATED FILE` header is a projection and is never edited
+by hand.

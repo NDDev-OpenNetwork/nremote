@@ -113,10 +113,10 @@ mod test {
 
     #[test]
     fn test_filename_license_string() {
-        assert!(get_custom_server_from_string("rustdesk.exe").is_err());
-        assert!(get_custom_server_from_string("rustdesk").is_err());
+        assert!(get_custom_server_from_string("nremote.exe").is_err());
+        assert!(get_custom_server_from_string("nremote").is_err());
         assert_eq!(
-            get_custom_server_from_string("rustdesk-host=server.example.net.exe").unwrap(),
+            get_custom_server_from_string("nremote-host=server.example.net.exe").unwrap(),
             CustomServer {
                 host: "server.example.net".to_owned(),
                 key: "".to_owned(),
@@ -125,7 +125,7 @@ mod test {
             }
         );
         assert_eq!(
-            get_custom_server_from_string("rustdesk-host=server.example.net,.exe").unwrap(),
+            get_custom_server_from_string("nremote-host=server.example.net,.exe").unwrap(),
             CustomServer {
                 host: "server.example.net".to_owned(),
                 key: "".to_owned(),
@@ -136,7 +136,7 @@ mod test {
         // key in these tests is "foobar.,2" base64 encoded
         assert_eq!(
             get_custom_server_from_string(
-                "rustdesk-host=server.example.net,api=abc,key=Zm9vYmFyLiwyCg==.exe"
+                "nremote-host=server.example.net,api=abc,key=Zm9vYmFyLiwyCg==.exe"
             )
             .unwrap(),
             CustomServer {
@@ -148,7 +148,7 @@ mod test {
         );
         assert_eq!(
             get_custom_server_from_string(
-                "rustdesk-host=server.example.net,key=Zm9vYmFyLiwyCg==,.exe"
+                "nremote-host=server.example.net,key=Zm9vYmFyLiwyCg==,.exe"
             )
             .unwrap(),
             CustomServer {
@@ -160,7 +160,7 @@ mod test {
         );
         assert_eq!(
             get_custom_server_from_string(
-                "rustdesk-host=server.example.net,key=Zm9vYmFyLiwyCg==,relay=server.example.net.exe"
+                "nremote-host=server.example.net,key=Zm9vYmFyLiwyCg==,relay=server.example.net.exe"
             )
             .unwrap(),
             CustomServer {
@@ -172,7 +172,7 @@ mod test {
         );
         assert_eq!(
             get_custom_server_from_string(
-                "rustdesk-Host=server.example.net,Key=Zm9vYmFyLiwyCg==,RELAY=server.example.net.exe"
+                "nremote-Host=server.example.net,Key=Zm9vYmFyLiwyCg==,RELAY=server.example.net.exe"
             )
             .unwrap(),
             CustomServer {
@@ -184,36 +184,36 @@ mod test {
         );
         let lic = CustomServer {
             host: "1.1.1.1".to_owned(),
-            key: "5Qbwsde3unUcJBtrx9ZkvUmwFNoExHzpryHuPUdqlWM=".to_owned(),
+            key: "<your-server-key>".to_owned(),
             api: "".to_owned(),
             relay: "".to_owned(),
         };
         assert_eq!(
-            get_custom_server_from_string("rustdesk-licensed-0nI900VsFHZVBVdIlncwpHS4V0bOZ0dtVldrpVO4JHdCp0YV5WdzUGZzdnYRVjI6ISeltmIsISMuEjLx4SMiojI0N3boJye.exe")
+            get_custom_server_from_string("nremote-licensed-0nI900VsFHZVBVdIlncwpHS4V0bOZ0dtVldrpVO4JHdCp0YV5WdzUGZzdnYRVjI6ISeltmIsISMuEjLx4SMiojI0N3boJye.exe")
                 .unwrap(), lic);
         assert_eq!(
-            get_custom_server_from_string("rustdesk-licensed-0nI900VsFHZVBVdIlncwpHS4V0bOZ0dtVldrpVO4JHdCp0YV5WdzUGZzdnYRVjI6ISeltmIsISMuEjLx4SMiojI0N3boJye(1).exe")
+            get_custom_server_from_string("nremote-licensed-0nI900VsFHZVBVdIlncwpHS4V0bOZ0dtVldrpVO4JHdCp0YV5WdzUGZzdnYRVjI6ISeltmIsISMuEjLx4SMiojI0N3boJye(1).exe")
                 .unwrap(), lic);
         assert_eq!(
-            get_custom_server_from_string("rustdesk--0nI900VsFHZVBVdIlncwpHS4V0bOZ0dtVldrpVO4JHdCp0YV5WdzUGZzdnYRVjI6ISeltmIsISMuEjLx4SMiojI0N3boJye(1).exe")
+            get_custom_server_from_string("nremote--0nI900VsFHZVBVdIlncwpHS4V0bOZ0dtVldrpVO4JHdCp0YV5WdzUGZzdnYRVjI6ISeltmIsISMuEjLx4SMiojI0N3boJye(1).exe")
                 .unwrap(), lic);
         assert_eq!(
-            get_custom_server_from_string("rustdesk-licensed-0nI900VsFHZVBVdIlncwpHS4V0bOZ0dtVldrpVO4JHdCp0YV5WdzUGZzdnYRVjI6ISeltmIsISMuEjLx4SMiojI0N3boJye (1).exe")
+            get_custom_server_from_string("nremote-licensed-0nI900VsFHZVBVdIlncwpHS4V0bOZ0dtVldrpVO4JHdCp0YV5WdzUGZzdnYRVjI6ISeltmIsISMuEjLx4SMiojI0N3boJye (1).exe")
                 .unwrap(), lic);
         assert_eq!(
-            get_custom_server_from_string("rustdesk-licensed-0nI900VsFHZVBVdIlncwpHS4V0bOZ0dtVldrpVO4JHdCp0YV5WdzUGZzdnYRVjI6ISeltmIsISMuEjLx4SMiojI0N3boJye (1) (2).exe")
+            get_custom_server_from_string("nremote-licensed-0nI900VsFHZVBVdIlncwpHS4V0bOZ0dtVldrpVO4JHdCp0YV5WdzUGZzdnYRVjI6ISeltmIsISMuEjLx4SMiojI0N3boJye (1) (2).exe")
                 .unwrap(), lic);
         assert_eq!(
-            get_custom_server_from_string("rustdesk-licensed-0nI900VsFHZVBVdIlncwpHS4V0bOZ0dtVldrpVO4JHdCp0YV5WdzUGZzdnYRVjI6ISeltmIsISMuEjLx4SMiojI0N3boJye--abc.exe")
+            get_custom_server_from_string("nremote-licensed-0nI900VsFHZVBVdIlncwpHS4V0bOZ0dtVldrpVO4JHdCp0YV5WdzUGZzdnYRVjI6ISeltmIsISMuEjLx4SMiojI0N3boJye--abc.exe")
                 .unwrap(), lic);
         assert_eq!(
-            get_custom_server_from_string("rustdesk-licensed--0nI900VsFHZVBVdIlncwpHS4V0bOZ0dtVldrpVO4JHdCp0YV5WdzUGZzdnYRVjI6ISeltmIsISMuEjLx4SMiojI0N3boJye--.exe")
+            get_custom_server_from_string("nremote-licensed--0nI900VsFHZVBVdIlncwpHS4V0bOZ0dtVldrpVO4JHdCp0YV5WdzUGZzdnYRVjI6ISeltmIsISMuEjLx4SMiojI0N3boJye--.exe")
                 .unwrap(), lic);
         assert_eq!(
-            get_custom_server_from_string("rustdesk-licensed---0nI900VsFHZVBVdIlncwpHS4V0bOZ0dtVldrpVO4JHdCp0YV5WdzUGZzdnYRVjI6ISeltmIsISMuEjLx4SMiojI0N3boJye--.exe")
+            get_custom_server_from_string("nremote-licensed---0nI900VsFHZVBVdIlncwpHS4V0bOZ0dtVldrpVO4JHdCp0YV5WdzUGZzdnYRVjI6ISeltmIsISMuEjLx4SMiojI0N3boJye--.exe")
                 .unwrap(), lic);
         assert_eq!(
-            get_custom_server_from_string("rustdesk-licensed--0nI900VsFHZVBVdIlncwpHS4V0bOZ0dtVldrpVO4JHdCp0YV5WdzUGZzdnYRVjI6ISeltmIsISMuEjLx4SMiojI0N3boJye--.exe")
+            get_custom_server_from_string("nremote-licensed--0nI900VsFHZVBVdIlncwpHS4V0bOZ0dtVldrpVO4JHdCp0YV5WdzUGZzdnYRVjI6ISeltmIsISMuEjLx4SMiojI0N3boJye--.exe")
                 .unwrap(), lic);
     }
 }

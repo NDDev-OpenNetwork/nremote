@@ -1,0 +1,56 @@
+nremote
+Copyright (C) 2026 NDDev
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU Affero General Public License as published by the Free
+Software Foundation, either version 3 of the License, or (at your option) any
+later version. See LICENCE for the full text.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE.
+
+--------------------------------------------------------------------------
+
+Attribution and modification notice, as required by sections 4 and 5 of the
+GNU Affero General Public License version 3.
+
+This is a modified version of the RustDesk client, Copyright (C) Purslane Ltd.
+and the RustDesk contributors, distributed under the same licence. This file
+exists to satisfy the licence and is the only place the prior work is named;
+the product, its binaries and its documentation are nremote. Dependency source
+URLs still resolve from that project's repositories, because that is where
+those crates live.
+
+Modified by NDDev beginning 2026-09-02. Changes so far:
+
+  * The shared protocol library under libs/hbb_common, previously consumed as
+    a git submodule, is vendored so this repository owns every line it builds.
+
+  * Every outbound call the client made on its own behalf is removed. The daily
+    version check reported the host's distribution, OS version, architecture
+    and a device fingerprint to a third-party endpoint; it is gone, along with
+    fingerprint.rs, the module that computed the fingerprint. The auto-updater
+    that downloaded and installed releases from that endpoint is disabled at
+    its entry points, because the request was the only thing that ever set the
+    URL it downloaded from. The default API server no longer falls back to the
+    vendor's hosted console.
+
+  * A third party's signing public key is removed from the custom-client
+    configuration path. It was a trust anchor: a configuration blob signed by
+    whoever holds the private half would have been accepted and applied.
+
+  * The compiled-in default rendezvous server and its public key are cleared.
+    Both are build inputs now, validated by scripts/configure.py, and absent
+    from this repository because it is public and a deployment address is a
+    fact about a private estate.
+
+  * The product identity is renamed to nremote by scripts/brand.py, which is
+    idempotent and whose --check mode is a CI gate.
+
+  * The wire protocol shared with nremote-server is pinned by digest and
+    checked on both sides by scripts/check_protocol_parity.py.
+
+The rendezvous protocol is unchanged. This client interoperates with servers
+built from the prior work, and nremote-server interoperates with clients built
+from it, which is what makes an incremental migration possible.
