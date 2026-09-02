@@ -70,25 +70,23 @@ bump.
   Deleting it is right and is a change that needs a macOS and Windows build to
   believe, which is why it is not folded into the commit that disabled it.
 - **A shared `nremote-common`.** See above.
-- **82 advisories in the application lockfile.** Measured 2026-09-02 with
-  osv-scanner over `Cargo.lock`; many have fixes available. There is one
-  lockfile — `libs/hbb_common` is a workspace member, not an independent crate
-  — so there is nothing smaller to scan honestly. They are not addressed
-  because there is no build in CI to verify an update against, and a lockfile
-  update nothing compiles is a change nobody can vouch for. `security.yml`
-  therefore has no `osv` job and says why in its place; `dependency-review`
-  holds the line against anything a pull request introduces. The build workflow
-  is what unblocks this.
+- **The advisory backlog in the application lockfile**, 82 when measured on
+  2026-09-02 and falling. There is one lockfile for the workspace —
+  `libs/hbb_common` is a member, not an independent crate — so there was
+  nothing smaller to scan honestly, and until `build.yml` existed there was no
+  way to verify an update. Both conditions are gone: Dependabot opens the
+  updates, `build.yml` compiles them and `dependency-review` refuses anything
+  new. `security.yml` still has no `osv` job, because a gate that fails on a
+  backlog somebody else is already clearing is noise rather than information.
 - **macOS and Android builds.** `build.yml` builds Linux x86_64 natively on a
   GitHub-hosted runner. The other two platforms follow, each on its own
   evidence rather than by copying a matrix entry: macOS needs its own vcpkg
   triplet and an Apple toolchain, Android needs the NDK and `cargo-ndk`.
   Neither is a variation on the Linux job.
-- **`build.yml` does not run on pull requests yet.** Its vcpkg set includes
-  ffmpeg with hardware-codec features, which is tens of minutes from cold. The
-  trigger is added once the binary cache is established and the warm duration
-  is measured, because putting an unmeasured cost in front of every review is a
-  tax paid on a guess.
+- **The application lockfile's advisories.** `build.yml` now runs on pull
+  requests, so a Dependabot bump that breaks the build is caught. That was the
+  condition on clearing the backlog, and it is met; what remains is Dependabot
+  working through it.
 
 - **The user interface is not statically analysed.** CodeQL has no Dart
   extractor, and `flutter/` is 357 of this repository's files. `dart analyze`

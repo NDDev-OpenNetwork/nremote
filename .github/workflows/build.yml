@@ -10,16 +10,23 @@ name: build
 # that a failure names the step that failed. macOS and Android follow, each on
 # its own evidence.
 #
-# It runs on `main` and on demand rather than on every pull request. The vcpkg
-# dependency set includes ffmpeg with hardware-codec features, which is tens of
-# minutes from cold, and putting that in front of every review before its warm
-# duration is known would be a tax paid on a guess. The pull-request trigger is
-# added once the cache is established and the timing is measured.
+# It runs on pull requests as well as on `main`, and that is measured rather
+# than assumed: the first green run took 26 minutes with a warm vcpkg cache, on
+# runners that are free for a public repository. The cost buys the one thing
+# nothing else here could prove -- that the application still compiles -- and it
+# buys it where it matters most. This repository's dependency backlog is being
+# closed by Dependabot, and a lockfile bump that breaks the build is exactly the
+# failure a review cannot catch by reading.
 
 on:
+  pull_request:
+    branches: [main]
   push:
     branches: [main]
   workflow_dispatch:
+  # `release.yml` calls this rather than restating it. A release that builds
+  # differently from `main` is a release nobody tested.
+  workflow_call:
 
 permissions:
   contents: read
@@ -68,11 +75,15 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update -y
+          # libunwind-dev is a hard Depends of libgstreamer1.0-dev that
+          # --no-install-recommends does not pull in. Without it apt reports
+          # "you have held broken packages", which reads like a broken runner
+          # image rather than a missing name in this list.
           sudo apt-get install --no-install-recommends -y \
             build-essential clang cmake curl g++ gcc git \
             libasound2-dev libayatana-appindicator3-dev libclang-dev \
             libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libgtk-3-dev \
-            libpulse-dev libssl-dev libva-dev libxcb-randr0-dev \
+            libpulse-dev libssl-dev libunwind-dev libva-dev libxcb-randr0-dev \
             libxcb-shape0-dev libxcb-xfixes0-dev libxdo-dev libxfixes-dev \
             llvm-dev nasm ninja-build pkg-config python3 rpm unzip wget xz-utils
           # opus is built by vcpkg with the options this project needs; the
@@ -84,6 +95,17 @@ jobs:
         with:
           toolchain: ${{ env.RUST_VERSION }}
           components: rustfmt
+          # The action defaults RUSTFLAGS to `-D warnings`, which is right for a
+          # lint job and wrong for this one. The toolchain here is pinned to
+          # 1.75 for the sciter ABI, and the source is written for a newer
+          # compiler: `#[allow(static_mut_refs)]` names a lint 1.75 does not
+          # have, so `unknown_lints` fires, and `redundant_imports` differs by
+          # version. Denying warnings turns both into a failed build of code
+          # that is not wrong.
+          #
+          # Lints belong to `ci.yml`, which runs them on stable where the lint
+          # set matches what the source expects. This job builds.
+          rustflags: ""
 
       # By hand, for the same reason as ui.yml: subosito/flutter-action calls
       # actions/cache@v5 internally and this organization requires full-SHA
