@@ -70,6 +70,12 @@ jobs:
       # Dart is generated from. When their toolchain pins drift, the analysis
       # passes against a toolchain nothing releases, which is a green check
       # that proves nothing about the artifact.
+      # The exemption in `commitlint.config.mjs` decides whether a dependency
+      # update can merge, and an exemption written one notch too wide reads
+      # exactly like a correct one. These controls are the difference.
+      - name: The commitlint exemption is not wider than stated
+        run: node scripts/check_commitlint_config.mjs
+
       - name: The build and analysis toolchains agree
         run: |
           set -euo pipefail
