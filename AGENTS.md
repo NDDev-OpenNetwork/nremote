@@ -92,6 +92,15 @@ bump.
   platforms and `dependency-review` refuses anything new. `security.yml` still
   has no `osv` job, because a gate that fails on a backlog somebody else is
   already clearing is noise rather than information.
+- **The major-version backlog.** Roughly 50 cargo dependencies are one or more
+  majors behind — `thiserror` 1 to 2, `rand` 0.8 to 0.9, `image` 0.24 to 0.25,
+  `gstreamer` 0.16 to 0.21, `objc2` 0.5 to 0.6 among them. None of it is
+  security-driven; the advisories travel in their own group. Dependabot used to
+  bundle all of them into one pull request, which could never merge because any
+  single crate needing a source change blocked the other 51. They now arrive
+  one at a time, five open at once, and each is a separate decision. Expect
+  several to need code, not just a lockfile.
+
 - **Signing.** The macOS build is unsigned and the Android build is
   debug-signed, because there is no Apple Developer ID and no release keystore.
   Both are stated in the artifact names and the release notes rather than
