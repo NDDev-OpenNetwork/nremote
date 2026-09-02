@@ -1,0 +1,201 @@
+name: build
+
+# The Linux desktop build, and the first platform this repository can produce.
+#
+# Upstream builds all six platforms in one 2472-line workflow that runs inside a
+# third-party containerised action, depends on a separate bridge job, and carries
+# matrix entries for architectures nothing here targets. Reproducing that in one
+# step would be a workflow nobody could review and nobody could debug. This is
+# the platform that can be built natively on a GitHub-hosted runner, written so
+# that a failure names the step that failed. macOS and Android follow, each on
+# its own evidence.
+#
+# It runs on `main` and on demand rather than on every pull request. The vcpkg
+# dependency set includes ffmpeg with hardware-codec features, which is tens of
+# minutes from cold, and putting that in front of every review before its warm
+# duration is known would be a tax paid on a guess. The pull-request trigger is
+# added once the cache is established and the timing is measured.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # 1.75, and not a newer toolchain by preference: the sciter binding breaks on
+  # the i128 ABI change in 1.78, and the whole workspace shares one toolchain.
+  RUST_VERSION: "1.75"
+  FLUTTER_VERSION: "3.24.5"
+  FLUTTER_SHA256: "a7c82f551a9eae018e078f6bb186171e5a77920d35a3d75a61d9a593d0a9e4ae"
+  CARGO_EXPAND_VERSION: "1.0.95"
+  FLUTTER_RUST_BRIDGE_VERSION: "1.80.1"
+  # The baseline `vcpkg.json` pins. Changing one without the other gives a
+  # manifest whose baseline no longer exists in the checked-out registry.
+  VCPKG_COMMIT_ID: "9e593bb18ea69cc5095e012465dcd675a822ed0d"
+  VCPKG_ROOT: "/opt/vcpkg"
+  VCPKG_DEFAULT_BINARY_CACHE: "/opt/vcpkg-cache"
+
+jobs:
+  linux:
+    name: linux x86_64
+    runs-on: ubuntu-22.04
+    timeout-minutes: 180
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Reclaim runner disk
+        run: |
+          set -euo pipefail
+          # The image ships ~25 GB of toolchains this build never touches, and
+          # vcpkg plus a release LTO link is not comfortable in what is left.
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+                      /usr/local/share/boost "${AGENT_TOOLSDIRECTORY:-/opt/hostedtoolcache}/CodeQL" || true
+          df -h /
+
+      - name: Install system dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update -y
+          sudo apt-get install --no-install-recommends -y \
+            build-essential clang cmake curl g++ gcc git \
+            libasound2-dev libayatana-appindicator3-dev libclang-dev \
+            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libgtk-3-dev \
+            libpulse-dev libssl-dev libva-dev libxcb-randr0-dev \
+            libxcb-shape0-dev libxcb-xfixes0-dev libxdo-dev libxfixes-dev \
+            llvm-dev nasm ninja-build pkg-config python3 rpm unzip wget xz-utils
+          # opus is built by vcpkg with the options this project needs; the
+          # distribution package shadows it at link time.
+          sudo apt-get remove -y libopus-dev || true
+
+      - name: Set up Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659  # v1.17.0
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          components: rustfmt
+
+      # By hand, for the same reason as ui.yml: subosito/flutter-action calls
+      # actions/cache@v5 internally and this organization requires full-SHA
+      # pinning, so the job is refused at setup. A published checksum is what
+      # makes an unpinned download safe.
+      - name: Install Flutter
+        run: |
+          set -euo pipefail
+          archive="flutter_linux_${FLUTTER_VERSION}-stable.tar.xz"
+          curl -fsSL --retry 3 --retry-max-time 180 -o "/tmp/${archive}" \
+            "https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/${archive}"
+          echo "${FLUTTER_SHA256}  /tmp/${archive}" | sha256sum -c -
+          tar -xJf "/tmp/${archive}" -C "${HOME}"
+          echo "${HOME}/flutter/bin" >> "${GITHUB_PATH}"
+          git config --global --add safe.directory "${HOME}/flutter"
+
+      - name: Report the toolchain
+        run: |
+          set -euo pipefail
+          rustc --version
+          flutter --version
+
+      # Keyed on the manifest and the registry baseline, which together decide
+      # every byte vcpkg produces. A hit turns tens of minutes of ffmpeg into a
+      # copy; a miss rebuilds and repopulates.
+      - name: Restore the vcpkg binary cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+          key: vcpkg-x64-linux-${{ env.VCPKG_COMMIT_ID }}-${{ hashFiles('vcpkg.json', 'res/vcpkg/**', 'res/vcpkg-triplets/**') }}
+          restore-keys: |
+            vcpkg-x64-linux-${{ env.VCPKG_COMMIT_ID }}-
+
+      - name: Install vcpkg dependencies
+        run: |
+          set -euo pipefail
+          sudo mkdir -p "${VCPKG_ROOT}" "${VCPKG_DEFAULT_BINARY_CACHE}"
+          sudo chown -R "$(id -u):$(id -g)" "${VCPKG_ROOT}" "${VCPKG_DEFAULT_BINARY_CACHE}"
+          git clone --quiet https://github.com/microsoft/vcpkg "${VCPKG_ROOT}"
+          git -C "${VCPKG_ROOT}" checkout --quiet "${VCPKG_COMMIT_ID}"
+          "${VCPKG_ROOT}/bootstrap-vcpkg.sh" -disableMetrics
+          # Manifest mode: the ports and versions come from vcpkg.json, so this
+          # cannot drift from what the code expects.
+          if ! "${VCPKG_ROOT}/vcpkg" install --triplet x64-linux \
+                 --x-install-root="${VCPKG_ROOT}/installed"; then
+            # A vcpkg failure is a compiler failure three directories down, and
+            # the summary line never says which. Print the logs rather than
+            # leaving the next person to reproduce it locally.
+            find "${VCPKG_ROOT}/" -name "*.log" -newermt '-30 minutes' | while read -r log; do
+              echo "::group::${log}"; tail -n 120 "${log}"; echo "::endgroup::"
+            done
+            exit 1
+          fi
+
+      - name: Install the bridge codegen
+        run: |
+          set -euo pipefail
+          cargo install cargo-expand --version "${CARGO_EXPAND_VERSION}" --locked
+          cargo install flutter_rust_bridge_codegen \
+            --version "${FLUTTER_RUST_BRIDGE_VERSION}" --features uuid --locked
+
+      - name: Generate the Rust-to-Dart bridge
+        run: |
+          set -euo pipefail
+          cd flutter && flutter pub get && cd ..
+          flutter_rust_bridge_codegen \
+            --rust-input ./src/flutter_ffi.rs \
+            --dart-output ./flutter/lib/generated_bridge.dart \
+            --c-output ./flutter/macos/Runner/bridge_generated.h
+          test -s ./flutter/lib/generated_bridge.dart
+
+      # build.py owns the flag set, the packaging layout and the file names, and
+      # duplicating any of that here would be a second answer that can only be
+      # wrong. It builds the cdylib, runs `flutter build linux --release` and
+      # assembles the package.
+      - name: Build
+        env:
+          VCPKG_ROOT: ${{ env.VCPKG_ROOT }}
+        run: python3 ./build.py --flutter
+
+      - name: Collect what was produced
+        id: collect
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          found=0
+
+          # The package, if build.py got that far.
+          while IFS= read -r -d '' deb; do
+            cp "$deb" dist/
+            found=1
+          done < <(find . -maxdepth 1 -name '*.deb' -print0)
+
+          # The unpackaged bundle, which is what actually proves the compile.
+          bundle=flutter/build/linux/x64/release/bundle
+          if [ -d "$bundle" ]; then
+            cp -r "$bundle" dist/nremote-linux-x64
+            found=1
+          fi
+
+          if [ "$found" -eq 0 ]; then
+            echo "the build reported success and produced nothing" >&2
+            ls -la . 2>/dev/null || true
+            ls -la flutter/build/linux/x64/release 2>/dev/null || true
+            exit 1
+          fi
+          du -sh dist/* || true
+
+      - name: Upload the build
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: nremote-linux-x86_64
+          path: dist
+          retention-days: 14
+          if-no-files-found: error
