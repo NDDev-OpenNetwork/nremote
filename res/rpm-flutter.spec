@@ -3,7 +3,7 @@ Version:    1.5.0
 Release:    0
 Summary:    RPM package
 License:    GPL-3.0
-URL:        https://rustdesk.com
+URL:        https://github.com/NDDev-OpenNetwork/nremote
 Vendor:     nremote <info@nremote.com>
 Requires:   gtk3 libxcb libXfixes alsa-lib libva gstreamer1-plugins-base
 Recommends: libayatana-appindicator-gtk3 libxdo

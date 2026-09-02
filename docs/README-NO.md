@@ -9,11 +9,11 @@
   <b>Vi trenger din hjelp til å oversette denne README-en, <a href="https://github.com/rustdesk/rustdesk/tree/master/src/lang">NRemote UI</a> og <a href="https://github.com/rustdesk/doc.rustdesk.com">NRemote Doc</a> tid ditt morsmål</b>
 </p>
 
-Snakk med oss: [Discord](https://discord.gg/nDceKgxnkV) | [Twitter](https://twitter.com/rustdesk) | [Reddit](https://www.reddit.com/r/rustdesk) | [YouTube](https://www.youtube.com/@rustdesk)
+Snakk med oss: [Discord](https://discord.gg/nDceKgxnkV) | [Twitter](https://twitter.com/nremote) | [Reddit](https://www.reddit.com/r/nremote) | [YouTube](https://www.youtube.com/@nremote)
 
-[![NRemote Server Pro](https://img.shields.io/badge/RustDesk%20Server%20Pro-Avanserte%20Funksjoner-blue)](https://rustdesk.com/pricing.html)
+[![NRemote Server Pro](https://img.shields.io/badge/NRemote%20Server%20Pro-Avanserte%20Funksjoner-blue)](https://github.com/NDDev-OpenNetwork/nremotepricing.html)
 
-Enda en annen fjernstyrt desktop programvare, skrevet i Rust. Virker rett ut av pakken, ingen konfigurasjon nødvendig. Du har full kontroll over din data, uten beskymring for sikkerhet. Du kan bruke vår rendezvous_mediator/relay server, [sett opp din egen](https://rustdesk.com/server), eller [skriv din egen rendezvous_mediator/relay server](https://github.com/rustdesk/rustdesk-server-demo).
+Enda en annen fjernstyrt desktop programvare, skrevet i Rust. Virker rett ut av pakken, ingen konfigurasjon nødvendig. Du har full kontroll over din data, uten beskymring for sikkerhet. Du kan bruke vår rendezvous_mediator/relay server, [sett opp din egen](https://github.com/NDDev-OpenNetwork/nremoteserver), eller [skriv din egen rendezvous_mediator/relay server](https://github.com/rustdesk/rustdesk-server-demo).
 
 ![image](https://user-images.githubusercontent.com/71636191/171661982-430285f0-2e12-4b1d-9957-4a58e375304d.png)
 
@@ -30,7 +30,7 @@ NRemote er velkommen for bidrag fra alle. Se [CONTRIBUTING.md](CONTRIBUTING-NO.m
     height="80">](https://f-droid.org/en/packages/com.carriez.flutter_hbb)
 [<img src="https://flathub.org/api/badge?svg&locale=en"
     alt="Få det på Flathub"
-    height="80">](https://flathub.org/apps/com.rustdesk.RustDesk)
+    height="80">](https://flathub.org/apps/com.nremote.NRemote)
 
 ## Avhengigheter
 
@@ -53,7 +53,7 @@ Venligst last ned Sciters dynamiske bibliotek selv.
 
 - Kjør `cargo run`
 
-## [Bygg](https://rustdesk.com/docs/en/dev/build/)
+## [Bygg](https://github.com/NDDev-OpenNetwork/nremotedev/build/)
 
 ## Hvordan Bygge til Linux
 

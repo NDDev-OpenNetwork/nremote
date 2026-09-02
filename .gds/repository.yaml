@@ -1,0 +1,80 @@
+schema_version: 1
+
+repository:
+  id: "repo_01M1FQ9VB0FGZ4YBYFNHTBT8BB"
+  display_name: "nremote"
+  roles:
+    - "project"
+  lifecycle: "active"
+
+provider:
+  type: "github"
+  installation: "installation:github-opennetwork"
+  repository_id: 1354133494
+  owner: "NDDev-OpenNetwork"
+  name: "nremote"
+
+classification:
+  portfolios:
+    - "portfolio:opennetwork-projects"
+  visibility_contract: "public"
+  data_classification: "public"
+
+product:
+  purpose: >-
+    The remote desktop client for nremote. It connects through a rendezvous
+    server the operator runs rather than a vendor's cloud, makes no outbound
+    call of its own, and carries no compiled-in default server: the address and
+    key are build inputs, so a build with neither reaches nothing.
+  capabilities:
+    - "connect to a peer through an operator-run rendezvous, direct or relayed"
+    - "carry the server address and public key compiled in at build time"
+    - "prove at build time that the product identity and the wire protocol have not drifted"
+  entrypoints:
+    - change: "the product identity, renamed idempotently and gated by --check"
+      path: "scripts/brand.py"
+    - change: "the compiled-in server address and public key"
+      path: "scripts/configure.py"
+    - change: "the wire protocol shared with nremote-server"
+      path: "libs/hbb_common/protos"
+    - change: "the client core"
+      path: "src"
+    - change: "the user interface"
+      path: "flutter"
+
+policy:
+  profiles:
+    - "repository-default"
+    - "opennetwork-default"
+  rollout_ring: "standard"
+
+git:
+  default_branch: "main"
+  integration: "pull-request"
+  branch_model: "task-branches"
+  handoff_pr: "preferred"
+  cleanup: "merged-only"
+
+verification:
+  commands:
+    build:
+      - "cargo build --locked --all-targets --manifest-path libs/hbb_common/Cargo.toml"
+    test:
+      - "cargo test --locked --all-targets --manifest-path libs/hbb_common/Cargo.toml"
+    lint:
+      - "python3 scripts/brand.py --check"
+      - "python3 scripts/check_protocol_parity.py"
+  required:
+    - "test"
+    - "lint"
+
+agent:
+  context_profile: "public-module"
+  generated_agents: false
+  serena:
+    enabled: false
+    provenance_required: false
+
+release:
+  mode: "github-release"
+  tag_style: "semver"

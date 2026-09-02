@@ -12,12 +12,12 @@
 > **免责声明:** <br>
 > NRemote 的开发人员不纵容或支持任何不道德或非法的软件使用行为。滥用行为，例如未经授权的访问、控制或侵犯隐私，严格违反我们的准则。作者对应用程序的任何滥用行为概不负责。
 
-与我们交流: [知乎](https://www.zhihu.com/people/rustdesk) | [Discord](https://discord.gg/nDceKgxnkV) | [Reddit](https://www.reddit.com/r/rustdesk) | [YouTube](https://www.youtube.com/@rustdesk)
+与我们交流: [知乎](https://www.zhihu.com/people/nremote) | [Discord](https://discord.gg/nDceKgxnkV) | [Reddit](https://www.reddit.com/r/nremote) | [YouTube](https://www.youtube.com/@nremote)
 
-[![NRemote Server Pro](https://img.shields.io/badge/RustDesk%20Server%20Pro-%E9%AB%98%E7%BA%A7%E5%8A%9F%E8%83%BD-blue)](https://rustdesk.com/pricing.html)
+[![NRemote Server Pro](https://img.shields.io/badge/NRemote%20Server%20Pro-%E9%AB%98%E7%BA%A7%E5%8A%9F%E8%83%BD-blue)](https://github.com/NDDev-OpenNetwork/nremotepricing.html)
 
 远程桌面软件，开箱即用，无需任何配置。您完全掌控数据，不用担心安全问题。您可以使用我们的注册/中继服务器，
-或者[自己设置](https://rustdesk.com/server)，
+或者[自己设置](https://github.com/NDDev-OpenNetwork/nremoteserver)，
 亦或者[开发您的版本](https://github.com/rustdesk/rustdesk-server-demo)。
 
 ![image](https://user-images.githubusercontent.com/71636191/171661982-430285f0-2e12-4b1d-9957-4a58e375304d.png)
@@ -55,7 +55,7 @@ NRemote 期待各位的贡献. 如何参与开发? 详情请看 [CONTRIBUTING-ZH
 
 - 运行 `cargo run`
 
-## [构建](https://rustdesk.com/docs/en/dev/build/)
+## [构建](https://github.com/NDDev-OpenNetwork/nremotedev/build/)
 
 ## 在 Linux 上编译
 

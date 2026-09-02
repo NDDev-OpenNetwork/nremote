@@ -40,13 +40,50 @@ RENAMES = (
     ("rustdesk", "nremote"),
 )
 
-# Anything matching these is an address. Masked before the rename.
+# Dependency source addresses. Masked before the rename, restored after.
+#
+# Only `github.com/rustdesk...`, and the narrowness is deliberate: an earlier
+# version protected every URL containing the name, which preserved the "Website",
+# "Download" and "Privacy Statement" links in the user interface -- branding
+# wearing a URL's clothes. Those are rewritten by the table below instead.
 PROTECTED = (
-    re.compile(r"https?://[^\s\"'<>)\]]*rustdesk[^\s\"'<>)\]]*", re.IGNORECASE),
     re.compile(r"\bgithub\.com/rustdesk[\w./-]*", re.IGNORECASE),
+    # Git refs on a dependency line. `portable-pty` resolves from a branch
+    # literally called `rustdesk/pty_based_0.8.1`, and the first version of
+    # this tool renamed the branch while carefully preserving the URL beside
+    # it -- producing a manifest that pointed at a branch which does not
+    # exist. A ref is an address too.
+    re.compile(r'\b(?:branch|tag|rev)\s*=\s*"[^"]*"'),
 )
 
-SKIP_FILES = {"Cargo.lock", "LICENCE", "LICENSE", "NOTICE", "scripts/brand.py"}
+# Product links that point at the prior work's website. A mechanical rename
+# would turn these into `nremote.com`, a domain we do not own and somebody else
+# might, which is worse than leaving them. Each one is redirected to the place
+# that actually answers the same question here, and the anchors are a promise
+# the README keeps.
+HOME = "https://github.com/NDDev-OpenNetwork/nremote"
+URL_REWRITES = {
+    "https://rustdesk.com/docs/en/manual/linux/#x11-required": f"{HOME}#x11-required",
+    "https://rustdesk.com/docs/en/manual/linux/#login-screen": f"{HOME}#login-screen",
+    "https://rustdesk.com/docs/en/": HOME,
+    "https://rustdesk.com/blog/id-relay-set/": f"{HOME}#pointing-a-client-at-a-server",
+    "https://rustdesk.com/download": f"{HOME}/releases",
+    "https://rustdesk.com/privacy.html": f"{HOME}#privacy",
+    "http://rustdesk.com/privacy": f"{HOME}#privacy",
+    "https://rustdesk.com/": HOME,
+    "https://rustdesk.com": HOME,
+}
+
+# Files whose job is to explain the derivation have to be allowed to name it.
+# NOTICE because the licence requires it; .gitleaks.toml because an allowlist
+SKIP_FILES = {
+    "Cargo.lock",
+    "LICENCE",
+    "LICENSE",
+    "NOTICE",
+    ".gitleaks.toml",  # entry that cannot say what it allows is not reviewable
+    "scripts/brand.py",
+}
 SKIP_SUFFIXES = {
     ".png", ".jpg", ".jpeg", ".ico", ".icns", ".gif", ".webp", ".woff", ".woff2",
     ".ttf", ".otf", ".zip", ".gz", ".xz", ".so", ".dll", ".dylib", ".a", ".bin",
@@ -80,8 +117,34 @@ def skipped(path: pathlib.Path) -> bool:
     )
 
 
+# The prior work's public server key, which appears 81 times across 42
+# translation files inside a help tip that shows an example connection string.
+# A base64 blob has no name in it, so nothing else here would touch it -- and a
+# third party's real key in our user interface is neither documentation nor
+# ours.
+#
+# The replacement is a placeholder rather than a realistic-looking key, and that
+# is the second attempt. The first was base64 that decoded to "nremote example
+# key -- not real!", which is self-documenting to a human and indistinguishable
+# from a credential to a secret scanner: it produced 79 findings, all of them
+# the thing that was supposed to fix the findings. A placeholder cannot make
+# that mistake, and the same sentence already uses `<key_value>` for the
+# abstract form, so it reads consistently.
+LITERAL_REWRITES = {
+    "5Qbwsde3unUcJBtrx9ZkvUmwFNoExHzpryHuPUdqlWM=": "<your-server-key>",
+    "bnJlbW90ZSBleGFtcGxlIGtleSAtLSBub3QgcmVhbCE=": "<your-server-key>",
+}
+
+
 def rename_text(text: str) -> str:
-    """Apply the renames with every address masked out of the way."""
+    """Apply the renames with every dependency address masked out of the way."""
+    for old_literal, new_literal in LITERAL_REWRITES.items():
+        text = text.replace(old_literal, new_literal)
+    # Longest first, so `https://rustdesk.com/docs/en/` cannot be eaten by the
+    # bare `https://rustdesk.com` entry.
+    for old_url in sorted(URL_REWRITES, key=len, reverse=True):
+        text = text.replace(old_url, URL_REWRITES[old_url])
+
     masked: list[str] = []
 
     def hide(match: re.Match[str]) -> str:
@@ -102,7 +165,12 @@ def findings(text: str) -> int:
     stripped = text
     for pattern in PROTECTED:
         stripped = pattern.sub("", stripped)
-    return sum(stripped.count(old) for old, _ in RENAMES)
+    for replacement in URL_REWRITES.values():
+        stripped = stripped.replace(replacement, "")
+    return (
+        sum(stripped.count(old) for old, _ in RENAMES)
+        + sum(stripped.count(old) for old in LITERAL_REWRITES)
+    )
 
 
 def main() -> int:

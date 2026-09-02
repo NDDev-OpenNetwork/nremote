@@ -762,7 +762,7 @@ fn is_pressed(key: &Key, en: &mut Enigo) -> bool {
 #[inline]
 #[cfg(target_os = "macos")]
 fn key_sleep() {
-    // https://www.reddit.com/r/rustdesk/comments/1kn1w5x/typing_lags_when_connecting_to_macos_clients/
+    // https://www.reddit.com/r/nremote/comments/1kn1w5x/typing_lags_when_connecting_to_macos_clients/
     //
     // There's a strange bug when running by `launchctl load -w /Library/LaunchAgents/abc.plist`
     // `std::thread::sleep(Duration::from_millis(20));` may sleep 90ms or more.

@@ -688,13 +688,13 @@ mod tests {
     fn update_download_file_rejects_untrusted_or_malformed_urls() {
         for url in [
             "http://github.com/rustdesk/rustdesk/releases/download/1/rustdesk.exe",
-            "https://example.com/rustdesk.exe",
-            "https://github.com/other/project/releases/download/1/rustdesk.exe",
+            "https://example.com/nremote.exe",
+            "https://github.com/other/project/releases/download/1/nremote.exe",
             "https://github.com/rustdesk/rustdesk/releases/download/1/",
             "https://github.com/rustdesk/rustdesk/releases/download/1/nested/rustdesk.exe",
-            "https://github.com/rustdesk/rustdesk/releases/download/1/C:rustdesk.exe",
+            "https://github.com/rustdesk/rustdesk/releases/download/1/C:nremote.exe",
             "https://user@github.com/rustdesk/rustdesk/releases/download/1/rustdesk.exe",
-            "https://github.com:443/rustdesk/rustdesk/releases/download/1/rustdesk.exe",
+            "https://github.com:443/nremote/nremote/releases/download/1/nremote.exe",
             "https://github.com/rustdesk/rustdesk/releases/download/1/rustdesk.exe?download=1",
             "https://github.com/rustdesk/rustdesk/releases/download/1/rustdesk.exe#download",
             "not a url",

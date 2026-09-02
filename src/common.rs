@@ -2867,25 +2867,25 @@ mod tests {
     #[test]
     fn test_is_public() {
         // Test URLs containing "nremote.com/"
-        assert!(is_public("https://rustdesk.com/"));
-        assert!(is_public("https://www.rustdesk.com/"));
-        assert!(is_public("https://api.rustdesk.com/v1"));
-        assert!(is_public("https://API.RUSTDESK.COM/v1"));
-        assert!(is_public("https://rustdesk.com/path"));
+        assert!(is_public("https://github.com/NDDev-OpenNetwork/nremote"));
+        assert!(is_public("https://www.nremote.com/"));
+        assert!(is_public("https://api.nremote.com/v1"));
+        assert!(is_public("https://API.NREMOTE.COM/v1"));
+        assert!(is_public("https://github.com/NDDev-OpenNetwork/nremotepath"));
 
         // Test URLs ending with "nremote.com"
         assert!(is_public("nremote.com"));
-        assert!(is_public("https://rustdesk.com"));
-        assert!(is_public("https://RustDesk.com"));
-        assert!(is_public("http://www.rustdesk.com"));
-        assert!(is_public("https://api.rustdesk.com"));
+        assert!(is_public("https://github.com/NDDev-OpenNetwork/nremote"));
+        assert!(is_public("https://NRemote.com"));
+        assert!(is_public("http://www.nremote.com"));
+        assert!(is_public("https://api.nremote.com"));
 
         // Test non-public URLs
         assert!(!is_public("https://example.com"));
         assert!(!is_public("https://custom-server.com"));
         assert!(!is_public("http://192.168.1.1"));
         assert!(!is_public("localhost"));
-        assert!(!is_public("https://rustdesk.computer.com"));
+        assert!(!is_public("https://github.com/NDDev-OpenNetwork/nremoteputer.com"));
         assert!(!is_public("nremote.comhello.com"));
     }
 
@@ -2896,7 +2896,7 @@ mod tests {
         assert!(is_public("api.nremote.com:21117"));
         assert!(!is_public("hello-nremote.com"));
         assert!(!is_public("api.nremote.com.evil.test"));
-        assert!(!is_public("https://rustdesk.com@evil.test"));
+        assert!(!is_public("https://github.com/NDDev-OpenNetwork/nremote@evil.test"));
     }
 
     #[test]
@@ -2914,8 +2914,8 @@ mod tests {
             "https://admin.example.com"
         ));
         assert!(!should_use_tcp_proxy_for_api_url(
-            "https://admin.rustdesk.com/api/login",
-            "https://admin.rustdesk.com"
+            "https://admin.nremote.com/api/login",
+            "https://admin.nremote.com"
         ));
         assert!(!should_use_tcp_proxy_for_api_url(
             "https://admin.example.com/api/login",
