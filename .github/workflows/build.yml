@@ -1,0 +1,526 @@
+name: build
+
+# The Linux desktop build, and the first platform this repository can produce.
+#
+# Upstream builds all six platforms in one 2472-line workflow that runs inside a
+# third-party containerised action, depends on a separate bridge job, and carries
+# matrix entries for architectures nothing here targets. Reproducing that in one
+# step would be a workflow nobody could review and nobody could debug. This is
+# the platform that can be built natively on a GitHub-hosted runner, written so
+# that a failure names the step that failed. macOS and Android follow, each on
+# its own evidence.
+#
+# It runs on pull requests as well as on `main`, and that is measured rather
+# than assumed: the first green run took 26 minutes with a warm vcpkg cache, on
+# runners that are free for a public repository. The cost buys the one thing
+# nothing else here could prove -- that the application still compiles -- and it
+# buys it where it matters most. This repository's dependency backlog is being
+# closed by Dependabot, and a lockfile bump that breaks the build is exactly the
+# failure a review cannot catch by reading.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+  # `release.yml` calls this rather than restating it. A release that builds
+  # differently from `main` is a release nobody tested.
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Upstream pins 1.75 because the sciter binding stops working on the i128 ABI
+  # change in 1.78. That constraint is about sciter at run time, and this
+  # product ships the Flutter interface on every platform it builds: the sciter
+  # UI is never started, and its library is loaded dynamically or not at all.
+  #
+  # Staying on 1.75 has a cost that does bind. Cargo 1.75 cannot parse a
+  # manifest that declares edition 2024, so it fails while downloading rather
+  # than while compiling, and every dependency that has moved to that edition
+  # becomes unacceptable - including security updates. That is what closed
+  # three dependency pull requests here on 2026-09-02.
+  RUST_VERSION: "1.98"
+  FLUTTER_VERSION: "3.24.5"
+  FLUTTER_SHA256: "a7c82f551a9eae018e078f6bb186171e5a77920d35a3d75a61d9a593d0a9e4ae"
+  FLUTTER_MACOS_ARM64_SHA256: "ca9624a6de7a1a8962f2f0a3e2a57b16434ca34f1137b8d9dc68c5ca1f187133"
+  # The NDK the Android build needs, and the version the ubuntu runner image
+  # already ships. r28c is 28.2.13676358; taking the one that is installed
+  # avoids a 722 MB download whose only published checksum is a SHA-1.
+  ANDROID_NDK_VERSION: "28.2.13676358"
+  CARGO_EXPAND_VERSION: "1.0.95"
+  FLUTTER_RUST_BRIDGE_VERSION: "1.80.1"
+  # The baseline `vcpkg.json` pins. Changing one without the other gives a
+  # manifest whose baseline no longer exists in the checked-out registry.
+  VCPKG_COMMIT_ID: "9e593bb18ea69cc5095e012465dcd675a822ed0d"
+  VCPKG_ROOT: "/opt/vcpkg"
+  VCPKG_DEFAULT_BINARY_CACHE: "/opt/vcpkg-cache"
+
+jobs:
+  linux:
+    name: linux x86_64
+    runs-on: ubuntu-22.04
+    timeout-minutes: 180
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Reclaim runner disk
+        run: |
+          set -euo pipefail
+          # The image ships ~25 GB of toolchains this build never touches, and
+          # vcpkg plus a release LTO link is not comfortable in what is left.
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+                      /usr/local/share/boost "${AGENT_TOOLSDIRECTORY:-/opt/hostedtoolcache}/CodeQL" || true
+          df -h /
+
+      - name: Install system dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update -y
+          # libunwind-dev is a hard Depends of libgstreamer1.0-dev that
+          # --no-install-recommends does not pull in. Without it apt reports
+          # "you have held broken packages", which reads like a broken runner
+          # image rather than a missing name in this list.
+          sudo apt-get install --no-install-recommends -y \
+            build-essential clang cmake curl g++ gcc git \
+            libasound2-dev libayatana-appindicator3-dev libclang-dev \
+            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libgtk-3-dev \
+            libpulse-dev libssl-dev libunwind-dev libva-dev libxcb-randr0-dev \
+            libxcb-shape0-dev libxcb-xfixes0-dev libxdo-dev libxfixes-dev \
+            llvm-dev nasm ninja-build pkg-config python3 rpm unzip wget xz-utils
+          # opus is built by vcpkg with the options this project needs; the
+          # distribution package shadows it at link time.
+          sudo apt-get remove -y libopus-dev || true
+
+      - name: Set up Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659  # v1.17.0
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          components: rustfmt
+          # The action defaults RUSTFLAGS to `-D warnings`, which is right for a
+          # lint job and wrong for this one. The toolchain here is pinned to
+          # 1.75 for the sciter ABI, and the source is written for a newer
+          # compiler: `#[allow(static_mut_refs)]` names a lint 1.75 does not
+          # have, so `unknown_lints` fires, and `redundant_imports` differs by
+          # version. Denying warnings turns both into a failed build of code
+          # that is not wrong.
+          #
+          # Lints belong to `ci.yml`, which runs them on stable where the lint
+          # set matches what the source expects. This job builds.
+          rustflags: ""
+
+      # By hand, for the same reason as ui.yml: subosito/flutter-action calls
+      # actions/cache@v5 internally and this organization requires full-SHA
+      # pinning, so the job is refused at setup. A published checksum is what
+      # makes an unpinned download safe.
+      - name: Install Flutter
+        run: |
+          set -euo pipefail
+          archive="flutter_linux_${FLUTTER_VERSION}-stable.tar.xz"
+          curl -fsSL --retry 3 --retry-max-time 180 -o "/tmp/${archive}" \
+            "https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/${archive}"
+          echo "${FLUTTER_SHA256}  /tmp/${archive}" | sha256sum -c -
+          tar -xJf "/tmp/${archive}" -C "${HOME}"
+          echo "${HOME}/flutter/bin" >> "${GITHUB_PATH}"
+          git config --global --add safe.directory "${HOME}/flutter"
+
+      - name: Report the toolchain
+        run: |
+          set -euo pipefail
+          rustc --version
+          flutter --version
+
+      # Keyed on the manifest and the registry baseline, which together decide
+      # every byte vcpkg produces. A hit turns tens of minutes of ffmpeg into a
+      # copy; a miss rebuilds and repopulates.
+      - name: Restore the vcpkg binary cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+          key: vcpkg-x64-linux-${{ env.VCPKG_COMMIT_ID }}-${{ hashFiles('vcpkg.json', 'res/vcpkg/**', 'res/vcpkg-triplets/**') }}
+          restore-keys: |
+            vcpkg-x64-linux-${{ env.VCPKG_COMMIT_ID }}-
+
+      - name: Install vcpkg dependencies
+        run: |
+          set -euo pipefail
+          sudo mkdir -p "${VCPKG_ROOT}" "${VCPKG_DEFAULT_BINARY_CACHE}"
+          sudo chown -R "$(id -u):$(id -g)" "${VCPKG_ROOT}" "${VCPKG_DEFAULT_BINARY_CACHE}"
+          git clone --quiet https://github.com/microsoft/vcpkg "${VCPKG_ROOT}"
+          git -C "${VCPKG_ROOT}" checkout --quiet "${VCPKG_COMMIT_ID}"
+          "${VCPKG_ROOT}/bootstrap-vcpkg.sh" -disableMetrics
+          # Manifest mode: the ports and versions come from vcpkg.json, so this
+          # cannot drift from what the code expects.
+          if ! "${VCPKG_ROOT}/vcpkg" install --triplet x64-linux \
+                 --x-install-root="${VCPKG_ROOT}/installed"; then
+            # A vcpkg failure is a compiler failure three directories down, and
+            # the summary line never says which. Print the logs rather than
+            # leaving the next person to reproduce it locally.
+            find "${VCPKG_ROOT}/" -name "*.log" -newermt '-30 minutes' | while read -r log; do
+              echo "::group::${log}"; tail -n 120 "${log}"; echo "::endgroup::"
+            done
+            exit 1
+          fi
+
+      - name: Install the bridge codegen
+        run: |
+          set -euo pipefail
+          cargo install cargo-expand --version "${CARGO_EXPAND_VERSION}" --locked
+          cargo install flutter_rust_bridge_codegen \
+            --version "${FLUTTER_RUST_BRIDGE_VERSION}" --features uuid --locked
+
+      - name: Generate the Rust-to-Dart bridge
+        run: |
+          set -euo pipefail
+          cd flutter && flutter pub get && cd ..
+          flutter_rust_bridge_codegen \
+            --rust-input ./src/flutter_ffi.rs \
+            --dart-output ./flutter/lib/generated_bridge.dart \
+            --c-output ./flutter/macos/Runner/bridge_generated.h
+          test -s ./flutter/lib/generated_bridge.dart
+
+      # build.py owns the flag set, the packaging layout and the file names, and
+      # duplicating any of that here would be a second answer that can only be
+      # wrong. It builds the cdylib, runs `flutter build linux --release` and
+      # assembles the package.
+      - name: Build
+        env:
+          VCPKG_ROOT: ${{ env.VCPKG_ROOT }}
+        run: python3 ./build.py --flutter
+
+      - name: Collect what was produced
+        id: collect
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          found=0
+
+          # The package, if build.py got that far.
+          while IFS= read -r -d '' deb; do
+            cp "$deb" dist/
+            found=1
+          done < <(find . -maxdepth 1 -name '*.deb' -print0)
+
+          # The unpackaged bundle, which is what actually proves the compile.
+          bundle=flutter/build/linux/x64/release/bundle
+          if [ -d "$bundle" ]; then
+            cp -r "$bundle" dist/nremote-linux-x64
+            found=1
+          fi
+
+          if [ "$found" -eq 0 ]; then
+            echo "the build reported success and produced nothing" >&2
+            ls -la . 2>/dev/null || true
+            ls -la flutter/build/linux/x64/release 2>/dev/null || true
+            exit 1
+          fi
+          du -sh dist/* || true
+
+      - name: Upload the build
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: nremote-linux-x86_64
+          path: dist
+          retention-days: 14
+          if-no-files-found: error
+
+  macos:
+    name: macos arm64
+    runs-on: macos-14
+    timeout-minutes: 180
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      # arm64 only. An Intel job would double the cost of this workflow to
+      # serve machines Apple stopped selling, and adding it later is one matrix
+      # entry once somebody needs it.
+      - name: Install build runtime
+        env:
+          NASM_SHA256: "0d29bcd8a5fc617333f4549c7c1f93d1866a4a0915c40359e0a8585bb1a5aa75"
+        run: |
+          set -euo pipefail
+          brew install --quiet llvm create-dmg
+          command -v pkg-config >/dev/null || brew install --quiet pkg-config
+          # NASM from the official release, not brew. Brew ships 3.x, which is a
+          # rewrite with different options and removed features; aom and the
+          # other codec ports need 2.x and fail inside vcpkg with a message
+          # about their own build system rather than about nasm.
+          curl -fsSL --retry 3 -o /tmp/nasm.zip \
+            "https://www.nasm.us/pub/nasm/releasebuilds/2.16.03/macosx/nasm-2.16.03-macosx.zip"
+          echo "${NASM_SHA256}  /tmp/nasm.zip" | shasum -a 256 -c -
+          unzip -q /tmp/nasm.zip -d /tmp
+          sudo cp /tmp/nasm-2.16.03/nasm /usr/local/bin/nasm
+          nasm --version
+
+      - name: Set up Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659  # v1.17.0
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          components: rustfmt
+          # Same reason as the Linux job: this builds, it does not lint.
+          rustflags: ""
+
+      - name: Install Flutter
+        run: |
+          set -euo pipefail
+          archive="flutter_macos_arm64_${FLUTTER_VERSION}-stable.zip"
+          curl -fsSL --retry 3 --retry-max-time 300 -o "/tmp/${archive}" \
+            "https://storage.googleapis.com/flutter_infra_release/releases/stable/macos/${archive}"
+          echo "${FLUTTER_MACOS_ARM64_SHA256}  /tmp/${archive}" | shasum -a 256 -c -
+          unzip -q "/tmp/${archive}" -d "${HOME}"
+          echo "${HOME}/flutter/bin" >> "${GITHUB_PATH}"
+          git config --global --add safe.directory "${HOME}/flutter"
+
+      # Two patches upstream applies to the SDK itself, carried here because
+      # dropping them means finding out at link time what they were for.
+      - name: Patch Flutter
+        run: |
+          set -euo pipefail
+          cd "$(dirname "$(dirname "$(command -v flutter)")")"
+          git apply "${GITHUB_WORKSPACE}/.github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff"
+          # https://github.com/flutter/flutter/issues/133533
+          sed -i '' -e 's|_setFramesEnabledState(false);|//_setFramesEnabledState(false);|g' \
+            packages/flutter/lib/src/scheduler/binding.dart
+          grep -n '_setFramesEnabledState(false);' packages/flutter/lib/src/scheduler/binding.dart
+
+      - name: Report the toolchain
+        run: |
+          set -euo pipefail
+          clang --version | head -1
+          rustc --version
+          flutter --version
+
+      - name: Restore the vcpkg binary cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+          key: vcpkg-arm64-osx-${{ env.VCPKG_COMMIT_ID }}-${{ hashFiles('vcpkg.json', 'res/vcpkg/**', 'res/vcpkg-triplets/**') }}
+          restore-keys: |
+            vcpkg-arm64-osx-${{ env.VCPKG_COMMIT_ID }}-
+
+      - name: Install vcpkg dependencies
+        run: |
+          set -euo pipefail
+          sudo mkdir -p "${VCPKG_ROOT}" "${VCPKG_DEFAULT_BINARY_CACHE}"
+          sudo chown -R "$(id -u):$(id -g)" "${VCPKG_ROOT}" "${VCPKG_DEFAULT_BINARY_CACHE}"
+          git clone --quiet https://github.com/microsoft/vcpkg "${VCPKG_ROOT}"
+          git -C "${VCPKG_ROOT}" checkout --quiet "${VCPKG_COMMIT_ID}"
+          "${VCPKG_ROOT}/bootstrap-vcpkg.sh" -disableMetrics
+          if ! "${VCPKG_ROOT}/vcpkg" install --triplet arm64-osx \
+                 --x-install-root="${VCPKG_ROOT}/installed"; then
+            find "${VCPKG_ROOT}/" -name "*.log" -mtime -1 | while read -r log; do
+              echo "::group::${log}"; tail -n 120 "${log}"; echo "::endgroup::"
+            done
+            exit 1
+          fi
+
+      - name: Install the bridge codegen
+        run: |
+          set -euo pipefail
+          cargo install cargo-expand --version "${CARGO_EXPAND_VERSION}" --locked
+          cargo install flutter_rust_bridge_codegen \
+            --version "${FLUTTER_RUST_BRIDGE_VERSION}" --features uuid --locked
+
+      - name: Generate the Rust-to-Dart bridge
+        run: |
+          set -euo pipefail
+          cd flutter && flutter pub get && cd ..
+          flutter_rust_bridge_codegen \
+            --rust-input ./src/flutter_ffi.rs \
+            --dart-output ./flutter/lib/generated_bridge.dart \
+            --c-output ./flutter/macos/Runner/bridge_generated.h
+          cp ./flutter/macos/Runner/bridge_generated.h ./flutter/ios/Runner/bridge_generated.h
+          test -s ./flutter/lib/generated_bridge.dart
+
+      - name: Build
+        run: python3 ./build.py --flutter
+
+      # Unsigned, and that is a statement rather than an omission: there is no
+      # Apple Developer ID here, so Gatekeeper will ask before this runs. The
+      # README says so; shipping something that pretends otherwise would be
+      # worse than saying it.
+      - name: Package the app
+        run: |
+          set -euo pipefail
+          app=./flutter/build/macos/Build/Products/Release/NRemote.app
+          test -d "$app" || { echo "no app bundle at $app" >&2; ls -la ./flutter/build/macos/Build/Products/Release || true; exit 1; }
+          create_dmg="$(command -v create-dmg)"
+          # create-dmg gives up unmounting too early on a busy runner.
+          sed -i '' -e 's/MAXIMUM_UNMOUNTING_ATTEMPTS=3/MAXIMUM_UNMOUNTING_ATTEMPTS=7/' "$(readlink -f "$create_dmg")"
+          mkdir -p dist
+          create-dmg --icon "NRemote.app" 200 190 --hide-extension "NRemote.app" \
+            --window-size 800 400 --app-drop-link 600 185 \
+            dist/nremote-macos-arm64-unsigned.dmg "$app"
+          du -sh dist/*
+
+      - name: Upload the build
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: nremote-macos-arm64
+          path: dist
+          retention-days: 14
+          if-no-files-found: error
+
+  android:
+    name: android arm64
+    runs-on: ubuntu-22.04
+    timeout-minutes: 180
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Reclaim runner disk
+        run: |
+          set -euo pipefail
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost \
+                      "${AGENT_TOOLSDIRECTORY:-/opt/hostedtoolcache}/CodeQL" || true
+          df -h /
+
+      - name: Install system dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update -y
+          sudo apt-get install --no-install-recommends -y \
+            clang cmake curl g++ g++-multilib gcc gcc-multilib git \
+            libasound2-dev libayatana-appindicator3-dev libc6-dev libclang-dev \
+            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libgtk-3-dev \
+            libpulse-dev libunwind-dev libva-dev libxcb-randr0-dev \
+            libxcb-shape0-dev libxcb-xfixes0-dev libxdo-dev libxfixes-dev \
+            llvm-dev nasm ninja-build openjdk-17-jdk-headless pkg-config unzip wget
+
+      - name: Locate the Android NDK
+        run: |
+          set -euo pipefail
+          ndk="${ANDROID_SDK_ROOT}/ndk/${ANDROID_NDK_VERSION}"
+          # The runner image ships this exact version. If it ever stops, this
+          # fails here with the list rather than three steps later with a
+          # linker error about a missing sysroot.
+          test -d "$ndk" || { echo "NDK ${ANDROID_NDK_VERSION} not on this image; available:" >&2; ls "${ANDROID_SDK_ROOT}/ndk" >&2; exit 1; }
+          echo "ANDROID_NDK_HOME=$ndk" >> "${GITHUB_ENV}"
+          echo "ANDROID_NDK_ROOT=$ndk" >> "${GITHUB_ENV}"
+
+      - name: Set up Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659  # v1.17.0
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          target: aarch64-linux-android
+          components: rustfmt
+          rustflags: ""
+
+      - name: Install Flutter
+        run: |
+          set -euo pipefail
+          archive="flutter_linux_${FLUTTER_VERSION}-stable.tar.xz"
+          curl -fsSL --retry 3 --retry-max-time 180 -o "/tmp/${archive}" \
+            "https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/${archive}"
+          echo "${FLUTTER_SHA256}  /tmp/${archive}" | sha256sum -c -
+          tar -xJf "/tmp/${archive}" -C "${HOME}"
+          echo "${HOME}/flutter/bin" >> "${GITHUB_PATH}"
+          git config --global --add safe.directory "${HOME}/flutter"
+
+      - name: Patch Flutter
+        run: |
+          set -euo pipefail
+          cd "$(dirname "$(dirname "$(command -v flutter)")")"
+          git apply "${GITHUB_WORKSPACE}/.github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff"
+
+      - name: Restore the vcpkg binary cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: ${{ env.VCPKG_DEFAULT_BINARY_CACHE }}
+          key: vcpkg-arm64-android-${{ env.VCPKG_COMMIT_ID }}-${{ hashFiles('vcpkg.json', 'res/vcpkg/**', 'res/vcpkg-triplets/**') }}
+          restore-keys: |
+            vcpkg-arm64-android-${{ env.VCPKG_COMMIT_ID }}-
+
+      - name: Install vcpkg dependencies
+        run: |
+          set -euo pipefail
+          sudo mkdir -p "${VCPKG_ROOT}" "${VCPKG_DEFAULT_BINARY_CACHE}"
+          sudo chown -R "$(id -u):$(id -g)" "${VCPKG_ROOT}" "${VCPKG_DEFAULT_BINARY_CACHE}"
+          git clone --quiet https://github.com/microsoft/vcpkg "${VCPKG_ROOT}"
+          git -C "${VCPKG_ROOT}" checkout --quiet "${VCPKG_COMMIT_ID}"
+          "${VCPKG_ROOT}/bootstrap-vcpkg.sh" -disableMetrics
+          # The repository's own script: it knows the ABI-to-triplet mapping and
+          # the NDK toolchain file, and restating either here would be a second
+          # answer that can only be wrong.
+          if ! ./flutter/build_android_deps.sh arm64-v8a; then
+            find "${VCPKG_ROOT}/" -name "*.log" -newermt '-60 minutes' | while read -r log; do
+              echo "::group::${log}"; tail -n 120 "${log}"; echo "::endgroup::"
+            done
+            exit 1
+          fi
+
+      - name: Install the bridge codegen
+        run: |
+          set -euo pipefail
+          cargo install cargo-expand --version "${CARGO_EXPAND_VERSION}" --locked
+          cargo install flutter_rust_bridge_codegen \
+            --version "${FLUTTER_RUST_BRIDGE_VERSION}" --features uuid --locked
+          cargo install cargo-ndk --version 3.1.2 --locked
+
+      - name: Generate the Rust-to-Dart bridge
+        run: |
+          set -euo pipefail
+          cd flutter && flutter pub get && cd ..
+          flutter_rust_bridge_codegen \
+            --rust-input ./src/flutter_ffi.rs \
+            --dart-output ./flutter/lib/generated_bridge.dart \
+            --c-output ./flutter/macos/Runner/bridge_generated.h
+          test -s ./flutter/lib/generated_bridge.dart
+
+      - name: Build the native library
+        run: |
+          set -euo pipefail
+          ./flutter/ndk_arm64.sh
+          mkdir -p ./flutter/android/app/src/main/jniLibs/arm64-v8a
+          cp ./target/aarch64-linux-android/release/liblibnremote.so \
+             ./flutter/android/app/src/main/jniLibs/arm64-v8a/libnremote.so
+          cp "${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so" \
+             ./flutter/android/app/src/main/jniLibs/arm64-v8a/
+
+      # Debug-signed, and that is the honest state: there is no release keystore
+      # here. An APK signed with a debug key installs and runs, and cannot be
+      # updated in place by a release-signed one later -- which is why the
+      # artifact name says so and the README repeats it.
+      - name: Build the APK
+        env:
+          JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+        run: |
+          set -euo pipefail
+          export PATH="${JAVA_HOME}/bin:${PATH}"
+          sed -i 's/org.gradle.jvmargs=-Xmx1024M/org.gradle.jvmargs=-Xmx2g/g' ./flutter/android/gradle.properties
+          sed -i 's/signingConfigs.release/signingConfigs.debug/g' ./flutter/android/app/build.gradle
+          cd flutter
+          flutter build apk --release --target-platform android-arm64 --split-per-abi
+          mkdir -p ../dist
+          mv build/app/outputs/flutter-apk/app-arm64-v8a-release.apk \
+             ../dist/nremote-android-arm64-debugsigned.apk
+          du -sh ../dist/*
+
+      - name: Upload the build
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: nremote-android-arm64
+          path: dist
+          retention-days: 14
+          if-no-files-found: error

@@ -1,7 +1,7 @@
 {
   "_comment": "The one thing that must not diverge between this client and nremote-server. See scripts/check_protocol_parity.py.",
   "peer_repository": "NDDev-OpenNetwork/nremote-server",
-  "peer_ref": "0.1.0",
+  "peer_ref": "0.2.0",
   "files": {
     "libs/hbb_common/protos/rendezvous.proto": "86f222ef2a36d335b170e4457db6ab8b04435a0e4efcd576ba65d496a7eae524"
   }

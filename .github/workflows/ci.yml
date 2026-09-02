@@ -66,6 +66,33 @@ jobs:
       - name: The wire protocol still matches the server
         run: python3 scripts/check_protocol_parity.py
 
+      # `ui.yml` analyses the generated Dart, `build.yml` ships the binary that
+      # Dart is generated from. When their toolchain pins drift, the analysis
+      # passes against a toolchain nothing releases, which is a green check
+      # that proves nothing about the artifact.
+      # The exemption in `commitlint.config.mjs` decides whether a dependency
+      # update can merge, and an exemption written one notch too wide reads
+      # exactly like a correct one. These controls are the difference.
+      - name: The commitlint exemption is not wider than stated
+        run: node scripts/check_commitlint_config.mjs
+
+      - name: The build and analysis toolchains agree
+        run: |
+          set -euo pipefail
+          for key in RUST_VERSION CARGO_EXPAND_VERSION FLUTTER_RUST_BRIDGE_VERSION; do
+            build=$(grep -E "^  ${key}: " .github/workflows/build.yml | head -1)
+            ui=$(grep -E "^  ${key}: " .github/workflows/ui.yml | head -1)
+            if [ -z "${build}" ] || [ -z "${ui}" ]; then
+              echo "${key} is missing from one of the two workflows" >&2
+              exit 1
+            fi
+            if [ "${build}" != "${ui}" ]; then
+              echo "${key} differs: build.yml has '${build}', ui.yml has '${ui}'" >&2
+              exit 1
+            fi
+          done
+          echo "build.yml and ui.yml agree on the pinned toolchain"
+
   shared-library:
     name: shared-library
     permissions:
@@ -93,3 +120,9 @@ jobs:
       issues: write # the stale bot closes threads
       pull-requests: write # the labeler applies labels
     uses: NDDev-OpenNetwork/ci-workflows/.github/workflows/pr-hygiene.yml@1ab6708b62ec7bd17f2d8a519c6fcc39edb22243
+    with:
+      # The stock configuration rejects any body line over 100 characters, and
+      # Dependabot writes a 144-character compare link into every git-ref bump.
+      # `commitlint.config.mjs` keeps the limit and exempts only lines that no
+      # amount of wrapping could shorten; the file itself carries the argument.
+      commitlint_config: commitlint.config.mjs
