@@ -42,6 +42,7 @@ pub use file_trait::FileManager;
 #[cfg(not(feature = "flutter"))]
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 use hbb_common::tokio::sync::mpsc::UnboundedSender;
+use hbb_common::crypto_sign as sign;
 use hbb_common::{
     allow_err,
     anyhow::{anyhow, Context},
@@ -59,7 +60,7 @@ use hbb_common::{
     rendezvous_proto::*,
     sha2::{Digest, Sha256},
     socket_client::{connect_tcp, connect_tcp_local, ipv4_to_ipv6, new_direct_udp_for},
-    sodiumoxide::{base64, crypto::sign},
+    sodiumoxide::base64,
     timeout,
     tokio::{
         self,

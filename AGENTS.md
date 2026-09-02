@@ -117,6 +117,12 @@ checks and the path validator used after an explicit download action. That
 validator accepts release assets from `NDDev-OpenNetwork/nremote` and no other
 origin; there is no scheduler, release lookup, or background download.
 
+Authentication signing uses `crypto_sign.rs`, byte-identical to the server's
+copy at the coordinated migration point. It preserves 64-byte
+`seed || public key` storage and `signature || message` wire payloads; the RFC
+8032 vector is the compatibility gate. `sodiumoxide` remains for unrelated
+`box_` and XSalsa20-Poly1305 `secretbox` protocol operations.
+
 ## Verification
 
 ```bash
