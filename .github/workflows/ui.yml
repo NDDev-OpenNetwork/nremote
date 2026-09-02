@@ -34,7 +34,8 @@ concurrency:
 env:
   # Pinned together and for one reason: the codegen writes Dart that has to
   # compile against the SDK that analyses it, so these three move as a set.
-  RUST_VERSION: "1.75"
+  # The Rust pin must match `build.yml`, which carries the argument for it.
+  RUST_VERSION: "1.98"
   # 3.24.5, the version the application targets. The bridge codegen was
   # pinned to 3.22.3 upstream, and analysing against that SDK reports
   # `createImageFromTextureSource` undefined and an int/double mismatch --
