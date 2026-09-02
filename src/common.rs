@@ -10,6 +10,7 @@ use serde_json::{json, Map, Value};
 
 #[cfg(not(target_os = "ios"))]
 use hbb_common::whoami;
+use hbb_common::crypto_sign as sign;
 use hbb_common::{
     allow_err,
     anyhow::{anyhow, Context},
@@ -26,7 +27,7 @@ use hbb_common::{
     protobuf::{Enum, Message as _},
     rendezvous_proto::*,
     socket_client,
-    sodiumoxide::crypto::{box_, secretbox, sign},
+    sodiumoxide::crypto::{box_, secretbox},
     timeout,
     tls::{get_cached_tls_accept_invalid_cert, get_cached_tls_type, upsert_tls_cache, TlsType},
     tokio::{
