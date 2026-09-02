@@ -1,5 +1,16 @@
 # AGENTS.md — nremote
 
+## Where the instructions live
+
+This file, and only this file. It arrived alongside a `CLAUDE.md` containing
+`@AGENTS.md` and a `GEMINI.md` containing `AGENTS.md` -- two pointers whose only
+job was to make other tools read this one. Both are gone, because every other
+public module in this organization carries `AGENTS.md` alone and a second
+instruction path is a second thing to keep in step.
+
+If a tool needs this file loaded and will not find it, point that tool at it.
+Do not add a copy.
+
 ## What this is
 
 The remote desktop client for [nremote-server](https://github.com/NDDev-OpenNetwork/nremote-server).
