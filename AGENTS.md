@@ -74,12 +74,6 @@ bump.
 
 ## Open work, named rather than implied
 
-- **The auto-updater module.** Its network path is dead — the request that set
-  `SOFTWARE_UPDATE_URL` is gone, so the download can never start — and the two
-  entry points return before it. What remains is several hundred lines of
-  Windows and macOS installer code behind `#[allow(unreachable_code)]`.
-  Deleting it is right and is a change that needs a macOS and Windows build to
-  believe, which is why it is not folded into the commit that disabled it.
 - **A shared `nremote-common`.** See above.
 - **The advisory backlog in the application lockfile.** 32 open Dependabot
   alerts on 2026-09-02. Two of them are `atty`, once per lockfile, and it has
@@ -110,12 +104,18 @@ bump.
 - **Intel macOS and 32-bit Android** are not built. Each is one matrix entry
   when somebody needs it; neither is worth doubling the workflow's cost on
   speculation.
+
 - **The user interface is analysed, but not by CodeQL.** CodeQL has no Dart
   extractor and `flutter/` is 357 of this repository's files, so `ui.yml` runs
   `flutter analyze` against the same SDK the release builds with. It runs
   `--no-fatal-infos --no-fatal-warnings`, which means it fails on errors only:
   it catches a broken bridge or a real type error, and says nothing about
   style. Narrowing that is work, not a decision already taken.
+
+The automatic updater is gone. `update_support.rs` retains only session-safety
+checks and the path validator used after an explicit download action. That
+validator accepts release assets from `NDDev-OpenNetwork/nremote` and no other
+origin; there is no scheduler, release lookup, or background download.
 
 ## Verification
 

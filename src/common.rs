@@ -93,11 +93,6 @@ pub mod input {
 }
 
 lazy_static::lazy_static! {
-    // Nothing writes this any more: the version-check request that used to set
-    // it is gone. It stays because two UIs read it, and the empty value they
-    // already handle is exactly the right answer -- this build has no update
-    // source, and releases are published through the repository.
-    pub static ref SOFTWARE_UPDATE_URL: Arc<Mutex<String>> = Default::default();
     pub static ref DEVICE_ID: Arc<Mutex<String>> = Default::default();
     pub static ref DEVICE_NAME: Arc<Mutex<String>> = Default::default();
     static ref PUBLIC_IPV6_ADDR: Arc<Mutex<(Option<SocketAddr>, Option<Instant>)>> = Default::default();

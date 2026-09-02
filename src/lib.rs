@@ -53,7 +53,7 @@ mod tray;
 mod whiteboard;
 
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
-mod updater;
+mod update_support;
 
 mod ui_cm_interface;
 mod ui_interface;
