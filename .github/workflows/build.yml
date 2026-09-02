@@ -24,6 +24,9 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  # `release.yml` calls this rather than restating it. A release that builds
+  # differently from `main` is a release nobody tested.
+  workflow_call:
 
 permissions:
   contents: read
