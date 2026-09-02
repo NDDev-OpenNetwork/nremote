@@ -69,12 +69,35 @@ jobs:
           toolchain: ${{ env.RUST_VERSION }}
           components: rustfmt
 
+      # Installed by hand rather than through `subosito/flutter-action`, and not
+      # by preference: that action calls `actions/cache@v5` internally, and this
+      # organization requires every action to be pinned to a full-length commit
+      # SHA, so the job is refused at setup before a single step runs. The
+      # composite's own pinning is not something a caller can fix.
+      #
+      # A pinned tarball with a published checksum is the same trade
+      # `ci-workflows` already makes for shellcheck and osv-scanner: an
+      # unpinned download into a build is a supply-chain hole, and a checksum
+      # is what closes it.
       - name: Install Flutter
-        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2  # v2.23.0
-        with:
-          channel: stable
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          cache: true
+        env:
+          FLUTTER_SHA256: '9c5f70ba118b9163552144901a2efd91d40b22a68a04e67271d6a5ad936e8368'
+        run: |
+          set -euo pipefail
+          archive="flutter_linux_${FLUTTER_VERSION}-stable.tar.xz"
+          curl -fsSL --retry 3 --retry-max-time 180 -o "/tmp/${archive}" \
+            "https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/${archive}"
+          echo "${FLUTTER_SHA256}  /tmp/${archive}" | sha256sum -c -
+          tar -xJf "/tmp/${archive}" -C "${HOME}"
+          echo "${HOME}/flutter/bin" >> "${GITHUB_PATH}"
+          # A checkout the SDK does not own is a repository it refuses to run in.
+          git config --global --add safe.directory "${HOME}/flutter"
+
+      - name: Report the toolchain
+        run: |
+          set -euo pipefail
+          flutter --version
+          dart --version
 
       - name: Install the bridge codegen
         run: |
