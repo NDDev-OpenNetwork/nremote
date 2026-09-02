@@ -26,12 +26,18 @@ jobs:
       security-events: write # CodeQL publishes its findings to code scanning
     uses: NDDev-OpenNetwork/ci-workflows/.github/workflows/public-codeql.yml@1ab6708b62ec7bd17f2d8a519c6fcc39edb22243
     with:
-      # Rust is absent, and that is a gap rather than a decision: extracting it
-      # needs a full build of an application that wants vcpkg, a Flutter SDK and
-      # a long list of system libraries, which belongs with build.yml. The
-      # shared library is analysed by `osv` and `cargo audit`; the Dart and
-      # workflow surfaces are analysed here.
-      languages: '["actions", "javascript-typescript"]'
+      # Actions only, and both absences are stated rather than implied.
+      #
+      # Rust needs a full build of an application that wants vcpkg, a Flutter
+      # SDK and a long list of system libraries; that belongs with build.yml and
+      # arrives with it.
+      #
+      # JavaScript was listed here and failed with "CodeQL could not process any
+      # code written in JavaScript/TypeScript", which is correct: the web client
+      # is not in this tree. The user interface is Dart, and CodeQL has no Dart
+      # extractor at all -- so the largest surface in this repository is not
+      # analysed by anything, and no configuration here changes that.
+      languages: '["actions"]'
       queries: security-and-quality
 
   dependency-review:

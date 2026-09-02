@@ -1,0 +1,112 @@
+name: ui
+
+# The user interface is 357 of this repository's files and nothing looked at
+# any of them. CodeQL has no Dart extractor, so no configuration there could
+# have covered it.
+#
+# Two steps, and the first is a check in its own right rather than a means to
+# the second. `flutter_rust_bridge_codegen` reads `src/flutter_ffi.rs` and
+# generates the Dart that calls into it: if an FFI signature changes and the
+# Dart side is not regenerated, or if the Rust no longer expresses a valid
+# bridge, this is where it shows. That matters here specifically, because
+# `main_get_software_update_url` was changed to a no-op when the update check
+# was removed, and the Dart bindings are generated against exactly that
+# signature.
+#
+# The generated Dart is deliberately not committed -- it is output, and a
+# committed output drifts from its input silently. Generating it on every run
+# is what makes the analysis below true of the source rather than of a snapshot.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ui-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Pinned together and for one reason: the codegen writes Dart that has to
+  # compile against the SDK that analyses it, so these three move as a set.
+  RUST_VERSION: "1.75"
+  FLUTTER_VERSION: "3.22.3"
+  CARGO_EXPAND_VERSION: "1.0.95"
+  FLUTTER_RUST_BRIDGE_VERSION: "1.80.1"
+
+jobs:
+  analyze:
+    name: analyze
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The codegen expands macros, so it needs a compiler and the headers the
+      # crate's build scripts reach for. This is the bridge's dependency list,
+      # not the application's: no vcpkg, no media codecs.
+      - name: Install prerequisites
+        run: |
+          set -euo pipefail
+          sudo apt-get update -y
+          sudo apt-get install --no-install-recommends -y \
+            clang cmake curl g++ gcc git libclang-dev libgtk-3-dev \
+            llvm-dev nasm ninja-build pkg-config wget
+
+      - name: Set up Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659  # v1.17.0
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          components: rustfmt
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2  # v2.23.0
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+
+      - name: Install the bridge codegen
+        run: |
+          set -euo pipefail
+          cargo install cargo-expand --version "${CARGO_EXPAND_VERSION}" --locked
+          cargo install flutter_rust_bridge_codegen \
+            --version "${FLUTTER_RUST_BRIDGE_VERSION}" --features uuid --locked
+
+      - name: Resolve Dart packages
+        run: |
+          set -euo pipefail
+          # extended_text 14 requires a newer Dart than the SDK this codegen is
+          # pinned to. Downgrading for resolution is what upstream does for the
+          # same reason, and it affects this job only -- the manifest on disk is
+          # not changed by the build that ships.
+          sed -i -e 's/extended_text: 14.0.0/extended_text: 13.0.0/g' flutter/pubspec.yaml
+          cd flutter && flutter pub get
+
+      - name: Generate the Rust-to-Dart bridge
+        run: |
+          set -euo pipefail
+          flutter_rust_bridge_codegen \
+            --rust-input ./src/flutter_ffi.rs \
+            --dart-output ./flutter/lib/generated_bridge.dart \
+            --c-output ./flutter/macos/Runner/bridge_generated.h
+          test -s ./flutter/lib/generated_bridge.dart
+
+      # Errors fail the job; warnings and lints do not, yet. The tree has never
+      # been analysed, so the count is unknown and a first run that fails on
+      # style would be a gate nobody could land against. Errors are the subset
+      # that means the code does not compile, and that subset is enforced from
+      # the first run.
+      - name: Analyze
+        working-directory: flutter
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings

@@ -82,6 +82,11 @@ bump.
 - **A full application build in CI.** `ci.yml` proves what is true of the
   source on any platform. The three-platform build is `build.yml`'s job.
 
+- **The user interface is not statically analysed.** CodeQL has no Dart
+  extractor, and `flutter/` is 357 of this repository's files. `dart analyze`
+  is the tool that exists for it and is not wired up; that is a gap with a
+  name, not a decision.
+
 ## Verification
 
 ```bash
