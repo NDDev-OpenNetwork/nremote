@@ -68,11 +68,15 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update -y
+          # libunwind-dev is a hard Depends of libgstreamer1.0-dev that
+          # --no-install-recommends does not pull in. Without it apt reports
+          # "you have held broken packages", which reads like a broken runner
+          # image rather than a missing name in this list.
           sudo apt-get install --no-install-recommends -y \
             build-essential clang cmake curl g++ gcc git \
             libasound2-dev libayatana-appindicator3-dev libclang-dev \
             libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev libgtk-3-dev \
-            libpulse-dev libssl-dev libva-dev libxcb-randr0-dev \
+            libpulse-dev libssl-dev libunwind-dev libva-dev libxcb-randr0-dev \
             libxcb-shape0-dev libxcb-xfixes0-dev libxdo-dev libxfixes-dev \
             llvm-dev nasm ninja-build pkg-config python3 rpm unzip wget xz-utils
           # opus is built by vcpkg with the options this project needs; the
