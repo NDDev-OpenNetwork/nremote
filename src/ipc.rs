@@ -1094,7 +1094,7 @@ async fn handle(data: Data, stream: &mut Connection) {
             allow_err!(
                 stream
                     .send(&Data::HasNoActiveConns(Some(
-                        crate::updater::has_no_active_conns()
+                        crate::update_support::has_no_active_conns()
                     )))
                     .await
             );
@@ -1104,7 +1104,7 @@ async fn handle(data: Data, stream: &mut Connection) {
             not(any(target_os = "android", target_os = "ios"))
         ))]
         Data::ControllingSessionCount(count) => {
-            crate::updater::update_controlling_session_count(count);
+            crate::update_support::update_controlling_session_count(count);
         }
         #[cfg(target_os = "linux")]
         Data::TerminalSessionCount(_) => {

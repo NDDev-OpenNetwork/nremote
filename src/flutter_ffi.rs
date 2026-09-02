@@ -2767,7 +2767,7 @@ pub fn main_set_common(_key: String, _value: String) {
     }
     #[cfg(any(target_os = "windows", target_os = "macos"))]
     {
-        use crate::updater::get_download_file_from_url;
+        use crate::update_support::get_download_file_from_url;
         if _key == "download-new-version" {
             let download_url = _value.clone();
             let event_key = "download-new-version".to_owned();

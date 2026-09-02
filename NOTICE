@@ -33,8 +33,10 @@ Modified by NDDev beginning 2026-09-02. Changes so far:
     fingerprint.rs, the module that computed the fingerprint. The auto-updater
     that downloaded and installed releases from that endpoint is disabled at
     its entry points, because the request was the only thing that ever set the
-    URL it downloaded from. The default API server no longer falls back to the
-    vendor's hosted console.
+    URL it downloaded from. The remaining unreachable platform installer and
+    scheduler code was subsequently deleted; only an explicitly requested
+    release-asset download path remains. The default API server no longer falls
+    back to the vendor's hosted console.
 
   * A third party's signing public key is removed from the custom-client
     configuration path. It was a trust anchor: a configuration blob signed by

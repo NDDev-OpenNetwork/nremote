@@ -832,12 +832,9 @@ pub fn lock_screen() {
     .ok();
 }
 
-/// Starts the macOS system service IPC listener and the background
-/// silent auto-update thread.
+/// Starts the macOS system service IPC listener.
 pub fn start_os_service() {
     log::info!("Username: {}", crate::username());
-    // Silent auto-update — runs as root via LaunchDaemon, no osascript dialog needed
-    crate::updater::start_auto_update_macos();
     if let Err(err) = crate::ipc::start("_service") {
         log::error!("Failed to start ipc_service: {}", err);
     }
@@ -1108,7 +1105,7 @@ pub fn update_from_dmg_as_root(dmg_path: &str, expected_version: &str) -> Result
 
     log::info!("[root-update] Starting silent root update from {}", dmg_path);
     // Check sessions before extracting to avoid unnecessary work
-    if !crate::updater::has_no_active_conns_ipc() {
+    if !crate::update_support::has_no_active_conns_ipc() {
         bail!("[root-update] Active session detected, deferring update.");
     }
     // Extract DMG to temp dir
@@ -1211,7 +1208,7 @@ pub fn update_from_dmg_as_root(dmg_path: &str, expected_version: &str) -> Result
     // directly from /tmp while ensuring the plist matches the new release.
 
     // Final session check after extraction — minimize race window
-    if !crate::updater::has_no_active_conns_ipc() {
+    if !crate::update_support::has_no_active_conns_ipc() {
         let _ = std::fs::remove_dir_all(&tmp_dir);
         bail!("[root-update] Active session detected after extraction, deferring update.");
     }
@@ -1220,7 +1217,7 @@ pub fn update_from_dmg_as_root(dmg_path: &str, expected_version: &str) -> Result
     // snapshot. The final IPC check then happens after the delay and as close
     // as possible to stopping those exact launchd domains.
     std::thread::sleep(std::time::Duration::from_secs(3));
-    if !crate::updater::has_no_active_conns_ipc() {
+    if !crate::update_support::has_no_active_conns_ipc() {
         bail!("[root-update] active session started before update launch");
     }
     let logged_in_uids = get_logged_in_uids();
@@ -1756,7 +1753,7 @@ rm -rf {tmp_dir}
     if get_logged_in_uids() != logged_in_uids {
         bail!("[root-update] GUI session set changed before update launch");
     }
-    if !crate::updater::has_no_active_conns_ipc() {
+    if !crate::update_support::has_no_active_conns_ipc() {
         bail!("[root-update] active session started before update launch");
     }
     if let Err(err) = Command::new("/bin/bash")
