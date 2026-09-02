@@ -10,7 +10,9 @@ updates:
       - /libs/virtual_display
     schedule:
       interval: weekly
-    open-pull-requests-limit: 10
+    # Five, not ten. Majors are no longer grouped (see below), so this is the
+    # width of the funnel they arrive through: merge one and the next appears.
+    open-pull-requests-limit: 5
     commit-message:
       prefix: "chore(deps)"
     # One pull request for the lot, and that is about cost rather than tidiness.
@@ -22,13 +24,17 @@ updates:
     #
     # Split by update type so that a patch-level sweep, which is nearly always
     # safe, is not held up behind a major that needs reading.
+    #
+    # Majors are deliberately not grouped. They were, and the result was one
+    # pull request carrying 52 major bumps - thiserror 1 to 2, rand 0.8 to 0.9,
+    # gstreamer 0.16 to 0.21, objc2 0.5 to 0.6 - where any single crate that
+    # needs a source change blocks the other 51. That is not a review unit, and
+    # it was never going to merge. Ungrouped, each major is its own pull
+    # request, its own build, and its own decision.
     groups:
       cargo-patch-and-minor:
         applies-to: version-updates
         update-types: ["minor", "patch"]
-      cargo-major:
-        applies-to: version-updates
-        update-types: ["major"]
       cargo-security:
         applies-to: security-updates
         patterns: ["*"]
