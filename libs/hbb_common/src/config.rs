@@ -11,7 +11,7 @@ use std::{
 
 use anyhow::{anyhow, Result};
 use bytes::Bytes;
-use rand::Rng;
+use rand::RngExt;
 use regex::Regex;
 use serde as de;
 use serde_derive::{Deserialize, Serialize};
@@ -1063,8 +1063,8 @@ impl Config {
         #[cfg(any(target_os = "android", target_os = "ios"))]
         {
             return Some(
-                rand::thread_rng()
-                    .gen_range(1_000_000_000..2_000_000_000)
+                rand::rng()
+                    .random_range(1_000_000_000..2_000_000_000)
                     .to_string(),
             );
         }
@@ -1094,9 +1094,9 @@ impl Config {
     }
 
     fn get_auto_password_with_chars(length: usize, chars: &[char]) -> String {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         (0..length)
-            .map(|_| chars[rng.gen::<usize>() % chars.len()])
+            .map(|_| chars[rng.random_range(0..chars.len())])
             .collect()
     }
 
@@ -1292,8 +1292,10 @@ impl Config {
     pub fn update_id() {
         // to-do: how about if one ip register a lot of ids?
         let id = Self::get_id();
-        let mut rng = rand::thread_rng();
-        let new_id = rng.gen_range(1_000_000_000..2_000_000_000).to_string();
+        let mut rng = rand::rng();
+        let new_id = rng
+            .random_range(1_000_000_000..2_000_000_000)
+            .to_string();
         Config::set_id(&new_id);
         log::info!("id updated from {} to {}", id, new_id);
     }
