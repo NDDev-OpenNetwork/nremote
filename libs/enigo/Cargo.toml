@@ -33,7 +33,7 @@ with_serde = ["serde", "serde_derive"]
 winapi = { version = "0.3", features = ["winuser", "winbase"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
-core-graphics = "0.22"
+core-graphics = "0.23"
 objc = "0.2"
 unicode-segmentation = "1.10"
 
