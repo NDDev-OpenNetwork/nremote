@@ -145,17 +145,24 @@ def skipped(path: pathlib.Path) -> bool:
 LITERAL_REWRITES = {
     "5Qbwsde3unUcJBtrx9ZkvUmwFNoExHzpryHuPUdqlWM=": "<your-server-key>",
     "bnJlbW90ZSBleGFtcGxlIGtleSAtLSBub3QgcmVhbCE=": "<your-server-key>",
+    # A bare hostname in a test fixture. `socket_client`'s NAT64 test resolves
+    # it for real, so the mechanical rename pointed a live DNS lookup at
+    # `nremote.com` -- a domain nobody here owns -- and the test failed in CI.
+    # RFC 2606 reserves `example.com` for exactly this.
+    "rustdesk.com": "example.com",
 }
 
 
 def rename_text(text: str) -> str:
     """Apply the renames with every dependency address masked out of the way."""
-    for old_literal, new_literal in LITERAL_REWRITES.items():
-        text = text.replace(old_literal, new_literal)
-    # Longest first, so `https://rustdesk.com/docs/en/` cannot be eaten by the
-    # bare `https://rustdesk.com` entry.
+    # URLs first, longest first, so that `https://rustdesk.com/docs/en/` is not
+    # eaten by the bare `https://rustdesk.com` entry -- and so that the bare-host
+    # literal below cannot pull the host out of a URL before its own entry
+    # matches.
     for old_url in sorted(URL_REWRITES, key=len, reverse=True):
         text = text.replace(old_url, URL_REWRITES[old_url])
+    for old_literal, new_literal in LITERAL_REWRITES.items():
+        text = text.replace(old_literal, new_literal)
 
     masked: list[str] = []
 

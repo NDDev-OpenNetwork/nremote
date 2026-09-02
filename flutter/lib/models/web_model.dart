@@ -42,7 +42,7 @@ typedef HandleEvent = Future<void> Function(Map<String, dynamic> evt);
 
 class PlatformFFI {
   final _eventHandlers = <String, Map<String, HandleEvent>>{};
-  final NRemoteImpl _ffiBind = NRemoteImpl();
+  final NremoteImpl _ffiBind = NremoteImpl();
 
   static String getByName(String name, [String arg = '']) {
     return context.callMethod('getByName', [name, arg]);
@@ -71,7 +71,7 @@ class PlatformFFI {
   static final PlatformFFI instance = PlatformFFI._();
 
   static get localeName => window.navigator.language;
-  NRemoteImpl get ffiBind => _ffiBind;
+  NremoteImpl get ffiBind => _ffiBind;
 
   static Future<String> getVersion() async {
     throw UnimplementedError();
