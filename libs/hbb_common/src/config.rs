@@ -69,7 +69,7 @@ lazy_static::lazy_static! {
     static ref ONLINE: Mutex<HashMap<String, i64>> = Default::default();
     pub static ref PROD_RENDEZVOUS_SERVER: RwLock<String> = RwLock::new("".to_owned());
     pub static ref EXE_RENDEZVOUS_SERVER: RwLock<String> = Default::default();
-    pub static ref APP_NAME: RwLock<String> = RwLock::new("RustDesk".to_owned());
+    pub static ref APP_NAME: RwLock<String> = RwLock::new(DEFAULT_APP_NAME.to_owned());
     static ref KEY_PAIR: Mutex<Option<KeyPair>> = Default::default();
     static ref USER_DEFAULT_CONFIG: RwLock<(UserDefaultConfig, Instant)> = RwLock::new((UserDefaultConfig::load(), Instant::now()));
     pub static ref NEW_STORED_PEER_CONFIG: Mutex<HashSet<String>> = Default::default();
@@ -102,8 +102,8 @@ pub const LINK_DOCS_X11_REQUIRED: &str = "https://rustdesk.com/docs/en/manual/li
 
 lazy_static::lazy_static! {
     pub static ref HELPER_URL: HashMap<&'static str, &'static str> = HashMap::from([
-        ("rustdesk docs home", LINK_DOCS_HOME),
-        ("rustdesk docs x11-required", LINK_DOCS_X11_REQUIRED),
+        ("nremote docs home", LINK_DOCS_HOME),
+        ("nremote docs x11-required", LINK_DOCS_X11_REQUIRED),
         ]);
 }
 
@@ -114,8 +114,24 @@ const CHARS: &[char] = &[
     'm', 'n', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
 ];
 
-pub const RENDEZVOUS_SERVERS: &[&str] = &["rs-ny.rustdesk.com"];
-pub const RS_PUB_KEY: &str = "OeVuKk5nlHiXp+APNn0Y3pC1Iwpwn44JGqrQCsWqmBw=";
+// The compiled-in product name. APP_NAME starts here and a signed custom
+// configuration may overwrite it at runtime, which is the only way the two
+// differ - and comparing them is how `is_custom_client` knows. It used to
+// compare against a bare literal, which is a copy of this value that nothing
+// keeps in step.
+pub const DEFAULT_APP_NAME: &str = "nremote";
+
+// No default. `rs-ny.nremote.com` is what a mechanical rename produced from
+// the prior work's public rendezvous host, and it resolves to nothing -- but
+// the shape of the mistake is the point: a build that ships a default sends
+// every unconfigured client somewhere its operator did not choose. The
+// address is supplied at build time by scripts/configure.py; absent that,
+// there is none.
+pub const RENDEZVOUS_SERVERS: &[&str] = &[];
+// This was the prior work's public server key and survived the rename
+// untouched, because a base64 blob has no name in it. Paired with the empty
+// default above: no server, no key.
+pub const RS_PUB_KEY: &str = "";
 
 pub const RENDEZVOUS_PORT: i32 = 21116;
 pub const RELAY_PORT: i32 = 21117;

@@ -1,7 +1,7 @@
 import 'package:xterm/xterm.dart';
 
-class RustDeskTerminal extends Terminal {
-  RustDeskTerminal({super.maxLines});
+class NRemoteTerminal extends Terminal {
+  NRemoteTerminal({super.maxLines});
 
   @override
   void eraseScrollbackOnly() {

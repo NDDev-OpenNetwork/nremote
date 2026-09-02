@@ -1,9 +1,9 @@
 #!/bin/bash
 
 #
-# Script to build F-Droid release of RustDesk
+# Script to build F-Droid release of NRemote
 #
-# Copyright (C) 2024, The RustDesk Authors
+# Copyright (C) 2024, The NRemote Authors
 #               2024, Vasyl Gello <vasek.gello@gmail.com>
 #
 
@@ -77,25 +77,25 @@ arm64-v8a)
 	FLUTTER_TARGET=android-arm64
 	NDK_TARGET=aarch64-linux-android
 	RUST_TARGET=aarch64-linux-android
-	RUSTDESK_FEATURES='flutter,hwcodec'
+	NREMOTE_FEATURES='flutter,hwcodec'
 	;;
 armeabi-v7a)
 	FLUTTER_TARGET=android-arm
 	NDK_TARGET=arm-linux-androideabi
 	RUST_TARGET=armv7-linux-androideabi
-	RUSTDESK_FEATURES='flutter,hwcodec'
+	NREMOTE_FEATURES='flutter,hwcodec'
 	;;
 x86_64)
 	FLUTTER_TARGET=android-x64
 	NDK_TARGET=x86_64-linux-android
 	RUST_TARGET=x86_64-linux-android
-	RUSTDESK_FEATURES='flutter'
+	NREMOTE_FEATURES='flutter'
 	;;
 x86)
 	FLUTTER_TARGET=android-x86
 	NDK_TARGET=i686-linux-android
 	RUST_TARGET=i686-linux-android
-	RUSTDESK_FEATURES='flutter'
+	NREMOTE_FEATURES='flutter'
 	;;
 *)
 	echo "ERROR: Unknown Android ABI '${ANDROID_ABI}'!" >&2
@@ -302,7 +302,7 @@ prebuild)
 		fi
 	fi
 
-	# Patch the RustDesk sources
+	# Patch the NRemote sources
 
 	git apply res/fdroid/patches/*.patch
 
@@ -367,7 +367,7 @@ prebuild)
 		unset BRIDGE_LLVM_PATH
 	fi
 
-	# Install Flutter version for RustDesk library build
+	# Install Flutter version for NRemote library build
 
 	prepare_flutter "${FLUTTER_VERSION}" "${HOME}/flutter"
 
@@ -453,7 +453,7 @@ build)
 
 	bash flutter/build_android_deps.sh "${ANDROID_ABI}"
 
-	# Build rustdesk lib
+	# Build nremote lib
 
 	cargo ndk \
 		--platform 21 \
@@ -462,12 +462,12 @@ build)
 		build \
 		--locked \
 		--release \
-		--features "${RUSTDESK_FEATURES}"
+		--features "${NREMOTE_FEATURES}"
 
 	mkdir -p "flutter/android/app/src/main/jniLibs/${ANDROID_ABI}"
 
-	cp "target/${RUST_TARGET}/release/liblibrustdesk.so" \
-		"flutter/android/app/src/main/jniLibs/${ANDROID_ABI}/librustdesk.so"
+	cp "target/${RUST_TARGET}/release/liblibnremote.so" \
+		"flutter/android/app/src/main/jniLibs/${ANDROID_ABI}/libnremote.so"
 
 	cp "${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/${NDK_TARGET}/libc++_shared.so" \
 		"flutter/android/app/src/main/jniLibs/${ANDROID_ABI}/"

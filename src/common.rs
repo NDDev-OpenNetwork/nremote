@@ -53,7 +53,7 @@ pub enum GrabState {
 pub type NotifyMessageBox = fn(String, String, String, String) -> dyn Future<Output = ()>;
 
 // the executable name of the portable version
-pub const PORTABLE_APPNAME_RUNTIME_ENV_KEY: &str = "RUSTDESK_APPNAME";
+pub const PORTABLE_APPNAME_RUNTIME_ENV_KEY: &str = "NREMOTE_APPNAME";
 
 pub const PLATFORM_WINDOWS: &str = "Windows";
 pub const PLATFORM_LINUX: &str = "Linux";
@@ -1005,8 +1005,8 @@ pub fn get_app_name() -> String {
 }
 
 #[inline]
-pub fn is_rustdesk() -> bool {
-    hbb_common::config::APP_NAME.read().unwrap().eq("RustDesk")
+pub fn is_nremote() -> bool {
+    hbb_common::config::APP_NAME.read().unwrap().eq("NRemote")
 }
 
 #[inline]
@@ -1097,7 +1097,7 @@ pub fn is_public(url: &str) -> bool {
         return false;
     };
     let host = host.strip_suffix('.').unwrap_or(host);
-    host == "rustdesk.com" || host.ends_with(".rustdesk.com")
+    host == "nremote.com" || host.ends_with(".nremote.com")
 }
 
 pub fn get_udp_punch_enabled() -> bool {
@@ -1985,7 +1985,7 @@ pub fn check_process(arg: &str, mut same_uid: bool) -> bool {
         if same_uid && p.user_id() != my_uid {
             continue;
         }
-        // on mac, p.cmd() get "/Applications/RustDesk.app/Contents/MacOS/RustDesk", "XPC_SERVICE_NAME=com.carriez.RustDesk_server"
+        // on mac, p.cmd() get "/Applications/NRemote.app/Contents/MacOS/NRemote", "XPC_SERVICE_NAME=com.carriez.NRemote_server"
         let parg = if p.cmd().len() <= 1 { "" } else { &p.cmd()[1] };
         if arg.is_empty() {
             if !parg.starts_with("--") {
@@ -2136,10 +2136,10 @@ impl ThrottledInterval {
     }
 }
 
-pub type RustDeskInterval = ThrottledInterval;
+pub type NRemoteInterval = ThrottledInterval;
 
 #[inline]
-pub fn rustdesk_interval(i: Interval) -> ThrottledInterval {
+pub fn nremote_interval(i: Interval) -> ThrottledInterval {
     ThrottledInterval::new(i)
 }
 
@@ -2246,7 +2246,21 @@ pub fn read_custom_client(config: &str) {
         log::error!("Failed to decode custom client config");
         return;
     };
-    const KEY: &str = "5Qbwsde3unUcJBtrx9ZkvUmwFNoExHzpryHuPUdqlWM=";
+    // The prior work shipped its own signing public key here, and a base64 blob
+    // has no name in it, so the rename left it untouched. That key is a trust
+    // anchor: a configuration blob signed by whoever holds the matching private
+    // half would have been accepted by this client and applied to its settings.
+    // We do not hold that half, so the mechanism was simultaneously a third
+    // party's authority over our configuration and unusable by us.
+    //
+    // Empty disables it. `custom.txt` is inert in this build. Putting a key we
+    // own here re-enables the mechanism with an anchor we control, which is a
+    // deliberate act rather than an inheritance.
+    const KEY: &str = "";
+    if KEY.is_empty() {
+        log::info!("custom client configuration is disabled: no signing key is configured");
+        return;
+    }
     let Some(pk) = get_rs_pk(KEY) else {
         log::error!("Failed to parse public key of custom client");
         return;
@@ -2344,35 +2358,21 @@ pub fn get_builtin_option(key: &str) -> String {
 
 #[inline]
 pub fn is_custom_client() -> bool {
-    get_app_name() != "RustDesk"
+    // Compared against the compiled-in default rather than a literal. It was a
+    // literal, and the rename moved APP_NAME out from under it: the default
+    // became "nremote" while this still said "NRemote", so every build would
+    // have reported itself as a custom client and taken sixteen branches meant
+    // for one.
+    get_app_name() != config::DEFAULT_APP_NAME
 }
 
 pub fn verify_login(_raw: &str, _id: &str) -> bool {
+    // Always true, and it was already always true: the body was commented out
+    // upstream. The commented block carried another of the prior work's public
+    // keys, which is the only reason it is deleted here rather than left alone.
     true
-    /*
-    if is_custom_client() {
-        return true;
-    }
-    #[cfg(debug_assertions)]
-    return true;
-    let Ok(pk) = crate::decode64("IycjQd4TmWvjjLnYd796Rd+XkK+KG+7GU1Ia7u4+vSw=") else {
-        return false;
-    };
-    let Some(key) = get_pk(&pk).map(|x| sign::PublicKey(x)) else {
-        return false;
-    };
-    let Ok(v) = crate::decode64(raw) else {
-        return false;
-    };
-    let raw = sign::verify(&v, &key).unwrap_or_default();
-    let v_str = std::str::from_utf8(&raw)
-        .unwrap_or_default()
-        .split(":")
-        .next()
-        .unwrap_or_default();
-    v_str == id
-    */
 }
+
 
 #[inline]
 pub fn is_udp_disabled() -> bool {
@@ -2756,12 +2756,12 @@ mod tests {
     // ThrottledInterval tick at the same time as tokio interval, if no sleeps
     #[allow(non_snake_case)]
     #[tokio::test]
-    async fn test_RustDesk_interval() {
+    async fn test_NRemote_interval() {
         let base_intervals = [interval_maker, interval_at_maker];
         for maker in base_intervals.into_iter() {
             let mut tokio_timer = maker();
             let mut tokio_times = Vec::new();
-            let mut timer = rustdesk_interval(maker());
+            let mut timer = nremote_interval(maker());
             let mut times = Vec::new();
             loop {
                 tokio::select! {
@@ -2805,10 +2805,10 @@ mod tests {
     // ThrottledInterval tick less times than tokio interval, if there're sleeps
     #[allow(non_snake_case)]
     #[tokio::test]
-    async fn test_RustDesk_interval_sleep() {
+    async fn test_NRemote_interval_sleep() {
         let base_intervals = [interval_maker, interval_at_maker];
         for (i, maker) in base_intervals.into_iter().enumerate() {
-            let mut timer = rustdesk_interval(maker());
+            let mut timer = nremote_interval(maker());
             let mut times = Vec::new();
             sleep(Duration::from_secs(3)).await;
             loop {
@@ -2866,15 +2866,15 @@ mod tests {
 
     #[test]
     fn test_is_public() {
-        // Test URLs containing "rustdesk.com/"
+        // Test URLs containing "nremote.com/"
         assert!(is_public("https://rustdesk.com/"));
         assert!(is_public("https://www.rustdesk.com/"));
         assert!(is_public("https://api.rustdesk.com/v1"));
         assert!(is_public("https://API.RUSTDESK.COM/v1"));
         assert!(is_public("https://rustdesk.com/path"));
 
-        // Test URLs ending with "rustdesk.com"
-        assert!(is_public("rustdesk.com"));
+        // Test URLs ending with "nremote.com"
+        assert!(is_public("nremote.com"));
         assert!(is_public("https://rustdesk.com"));
         assert!(is_public("https://RustDesk.com"));
         assert!(is_public("http://www.rustdesk.com"));
@@ -2886,16 +2886,16 @@ mod tests {
         assert!(!is_public("http://192.168.1.1"));
         assert!(!is_public("localhost"));
         assert!(!is_public("https://rustdesk.computer.com"));
-        assert!(!is_public("rustdesk.comhello.com"));
+        assert!(!is_public("nremote.comhello.com"));
     }
 
     #[test]
-    fn test_is_public_matches_rustdesk_root_domain() {
-        assert!(is_public("rustdesk.com/"));
-        assert!(is_public("rustdesk.com:21117"));
-        assert!(is_public("api.rustdesk.com:21117"));
-        assert!(!is_public("hello-rustdesk.com"));
-        assert!(!is_public("api.rustdesk.com.evil.test"));
+    fn test_is_public_matches_nremote_root_domain() {
+        assert!(is_public("nremote.com/"));
+        assert!(is_public("nremote.com:21117"));
+        assert!(is_public("api.nremote.com:21117"));
+        assert!(!is_public("hello-nremote.com"));
+        assert!(!is_public("api.nremote.com.evil.test"));
         assert!(!is_public("https://rustdesk.com@evil.test"));
     }
 
