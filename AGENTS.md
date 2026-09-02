@@ -87,6 +87,19 @@ bump.
   is the tool that exists for it and is not wired up; that is a gap with a
   name, not a decision.
 
+## Before the first release
+
+`Cargo.toml` and `flutter/pubspec.yaml` still carry `1.5.0`, which is the prior
+work's version rather than this repository's. `nremote-server` was renumbered to
+`0.1.0` for exactly the reason that applies here: a version that belongs to
+somebody else's release history is a fact nobody can look up.
+
+It is not renumbered yet because nothing ships from this repository — there is
+no build, so no artifact and no `--version` output reaches anyone — and the
+change re-resolves a workspace of twenty git dependencies, which takes half an
+hour and would have to be redone at release time regardless. It happens with
+the first release, in the same commit as the build that produces it.
+
 ## Verification
 
 ```bash
