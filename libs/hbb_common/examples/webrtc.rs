@@ -3,10 +3,18 @@ extern crate hbb_common;
 #[cfg(feature = "webrtc")]
 use hbb_common::webrtc::WebRTCStream;
 
+// Everything below the WebRTCStream import is used only by the feature-gated
+// main; without the gate they are unused imports, which `-D warnings` makes an
+// error. The example compiled before only because nothing had ever built it
+// with warnings denied.
+#[cfg(feature = "webrtc")]
 use std::io::Write;
 use anyhow::Result;
+#[cfg(feature = "webrtc")]
 use bytes::Bytes;
+#[cfg(feature = "webrtc")]
 use clap::{Arg, Command};
+#[cfg(feature = "webrtc")]
 use tokio::time::Duration;
 
 #[cfg(not(feature = "webrtc"))]

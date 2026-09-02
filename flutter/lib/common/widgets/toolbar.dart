@@ -495,7 +495,7 @@ List<TTextMenu> toolbarControls(BuildContext context, String id, FFI ffi) {
               // Web: login is required before connection, so no need to refresh
               // Mobile: same isolate, no need to send message
               if (isDesktop) {
-                rustDeskWinManager.call(
+                nRemoteWinManager.call(
                     WindowType.Main, kWindowRefreshCurrentUser, "");
               }
             }

@@ -32,13 +32,25 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
-# The three cases the source actually uses, longest first so that a shorter
-# pattern cannot eat the prefix of a longer one.
-RENAMES = (
-    ("RUSTDESK", "NREMOTE"),
-    ("RustDesk", "NRemote"),
-    ("rustdesk", "nremote"),
-)
+# One case-insensitive pattern, with the replacement derived from the shape of
+# what it matched. The first version listed three literal spellings, and that
+# is exactly how it missed two: `Rustdesk` in the Dart FFI binding and
+# `rustDesk` in 45 identifiers. Worse, `--check` counted the same three
+# literals, so the gate was blind to precisely what it existed to catch and
+# reported the tree clean. A list of spellings is a guess about what the source
+# contains; a pattern is not.
+TOKEN = re.compile(r"rustdesk", re.IGNORECASE)
+
+
+def _rename_token(match: "re.Match[str]") -> str:
+    text = match.group(0)
+    if text.isupper():
+        return "NREMOTE"
+    if text.islower():
+        return "nremote"
+    if text[0].isupper():
+        return "NRemote"  # RustDesk, Rustdesk
+    return "nRemote"  # rustDesk, and any other lowercase-initial mixed case
 
 # Dependency source addresses. Masked before the rename, restored after.
 #
@@ -153,8 +165,7 @@ def rename_text(text: str) -> str:
 
     for pattern in PROTECTED:
         text = pattern.sub(hide, text)
-    for old, new in RENAMES:
-        text = text.replace(old, new)
+    text = TOKEN.sub(_rename_token, text)
     for index, original in enumerate(masked):
         text = text.replace(f"\x00{index}\x00", original)
     return text
@@ -167,9 +178,8 @@ def findings(text: str) -> int:
         stripped = pattern.sub("", stripped)
     for replacement in URL_REWRITES.values():
         stripped = stripped.replace(replacement, "")
-    return (
-        sum(stripped.count(old) for old, _ in RENAMES)
-        + sum(stripped.count(old) for old in LITERAL_REWRITES)
+    return len(TOKEN.findall(stripped)) + sum(
+        stripped.count(old) for old in LITERAL_REWRITES
     )
 
 
