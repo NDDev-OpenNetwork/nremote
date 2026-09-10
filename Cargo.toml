@@ -176,7 +176,7 @@ keepawake = { git = "https://github.com/rustdesk-org/keepawake-rs" }
 wallpaper = { git = "https://github.com/rustdesk-org/wallpaper.rs" }
 tiny-skia = "0.11"
 softbuffer = "0.4"
-fontdb = "0.23"
+fontdb = "0.24"
 bytemuck = "1.23"
 ttf-parser = "0.25"
 
@@ -193,7 +193,7 @@ x11-clipboard = {git="https://github.com/clslaid/x11-clipboard", branch = "feat/
 x11rb =  {version = "0.12", features = ["all-extensions"], optional = true}
 percent-encoding = {version = "2.3", optional = true}
 once_cell = {version = "1.18", optional = true}
-nix = { version = "0.29", features = ["term", "process"]}
+nix = { version = "0.31", features = ["term", "process"]}
 gtk = "0.18"
 termios = "0.3"
 terminfo = "0.8"
