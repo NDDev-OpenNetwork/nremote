@@ -38,6 +38,16 @@ updates:
       cargo-security:
         applies-to: security-updates
         patterns: ["*"]
+      # The one exception to "majors are not grouped". piet-coregraphics pins
+      # an exact piet, so a piet major arriving alone cannot compile: every
+      # RenderContext method disappears from CoreGraphicsContext at once and
+      # the macOS build fails with a dozen E0599s that say nothing about the
+      # real cause. The two are one decision, so they are one pull request.
+      piet:
+        applies-to: version-updates
+        patterns:
+          - "piet"
+          - "piet-coregraphics"
     # A version published minutes ago has been reviewed by nobody. The cooldown
     # is the cheapest defence against a compromised release being pulled in
     # before anyone has looked at it, and costs only a few days of latency on
