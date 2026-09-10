@@ -5460,7 +5460,7 @@ dependencies = [
  "libxdo-sys",
  "mac_address",
  "magnum-opus",
- "nix 0.29.0",
+ "nix 0.31.3",
  "num_cpus",
  "objc",
  "objc_id",
