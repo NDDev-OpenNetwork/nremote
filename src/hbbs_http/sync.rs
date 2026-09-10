@@ -320,7 +320,7 @@ pub fn register_switch_grant(switch_uuid: String) {
         if api_server.is_empty() || crate::is_public(&api_server) {
             return;
         }
-        use hbb_common::sodiumoxide::crypto::{hash::sha256, sign};
+        use hbb_common::{crypto_sign as sign, sodiumoxide::crypto::hash::sha256};
         let switch_code = crate::encode64(sha256::hash(switch_uuid.as_bytes()).0);
         let switch_code_verifier = switch_code_verifier(&switch_code);
         let timestamp = (hbb_common::get_time() / 1000).to_string();

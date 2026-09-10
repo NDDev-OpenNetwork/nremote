@@ -53,6 +53,11 @@ Modified by NDDev beginning 2026-09-02. Changes so far:
   * The wire protocol shared with nremote-server is pinned by digest and
     checked on both sides by scripts/check_protocol_parity.py.
 
+  * Authentication signing is moved from an unmaintained wrapper to
+    `ed25519-dalek`. Persisted device keypairs and signed server messages retain
+    their existing byte layouts, verified against the RFC 8032 Ed25519 test
+    vector; malformed stored keypairs are rejected before use.
+
 The rendezvous protocol is unchanged. This client interoperates with servers
 built from the prior work, and nremote-server interoperates with clients built
 from it, which is what makes an incremental migration possible.

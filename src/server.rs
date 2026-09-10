@@ -10,6 +10,7 @@ use bytes::Bytes;
 pub use connection::*;
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 use hbb_common::config::Config2;
+use hbb_common::crypto_sign as sign;
 use hbb_common::tcp::{self, new_listener};
 use hbb_common::{
     allow_err,
@@ -21,7 +22,7 @@ use hbb_common::{
     protobuf::{Enum, Message as _},
     rendezvous_proto::*,
     socket_client,
-    sodiumoxide::crypto::{box_, sign},
+    sodiumoxide::crypto::box_,
     timeout, tokio, ResultType, Stream,
 };
 use scrap::camera;
