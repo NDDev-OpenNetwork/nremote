@@ -97,7 +97,7 @@ jobs:
     name: shared-library
     permissions:
       contents: read
-    uses: NDDev-OpenNetwork/ci-workflows/.github/workflows/rust-ci.yml@1ab6708b62ec7bd17f2d8a519c6fcc39edb22243
+    uses: NDDev-OpenNetwork/ci-workflows/.github/workflows/rust-ci.yml@37a827f921f62353664fc4bcd872f05b65efe71a # 0.1.24
     with:
       working_directory: libs/hbb_common
       test_matrix_os: '["ubuntu-latest", "macos-latest"]'
@@ -110,7 +110,7 @@ jobs:
     name: actionlint
     permissions:
       contents: read
-    uses: NDDev-OpenNetwork/ci-workflows/.github/workflows/actionlint.yml@9231ee7421354867b0fe0e019c4e20dcce5d05e7
+    uses: NDDev-OpenNetwork/ci-workflows/.github/workflows/actionlint.yml@37a827f921f62353664fc4bcd872f05b65efe71a # 0.1.24
 
   pr-hygiene:
     name: pr-hygiene
@@ -119,7 +119,7 @@ jobs:
       contents: read
       issues: write # the stale bot closes threads
       pull-requests: write # the labeler applies labels
-    uses: NDDev-OpenNetwork/ci-workflows/.github/workflows/pr-hygiene.yml@1ab6708b62ec7bd17f2d8a519c6fcc39edb22243
+    uses: NDDev-OpenNetwork/ci-workflows/.github/workflows/pr-hygiene.yml@37a827f921f62353664fc4bcd872f05b65efe71a # 0.1.24
     with:
       # The stock configuration rejects any body line over 100 characters, and
       # Dependabot writes a 144-character compare link into every git-ref bump.
