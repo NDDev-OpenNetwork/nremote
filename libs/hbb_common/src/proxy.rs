@@ -523,6 +523,7 @@ impl Proxy {
         self.http_connect(stream, target_addr).await
     }
 
+    #[allow(clippy::double_must_use)]
     #[async_recursion]
     async fn https_connect_rustls_wrap_danger<'a>(
         &self,
