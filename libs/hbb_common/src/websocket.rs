@@ -86,6 +86,7 @@ impl WsFramedStream {
         .await
     }
 
+    #[allow(clippy::double_must_use)]
     #[async_recursion]
     async fn try_connect(
         url: &str,
