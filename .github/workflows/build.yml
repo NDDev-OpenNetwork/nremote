@@ -104,12 +104,12 @@ jobs:
           sudo apt-get remove -y libopus-dev || true
 
       - name: Set up Rust toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659  # v1.17.0
+        uses: actions-rust-lang/setup-rust-toolchain@ecabd13d1c56bd1345c230e542e9144811ad706f  # v2.0.0
         with:
           toolchain: ${{ env.RUST_VERSION }}
           components: rustfmt
-          # The action defaults RUSTFLAGS to `-D warnings`, which is right for a
-          # lint job and wrong for this one. The toolchain here is pinned to
+          # The action defaults CARGO_BUILD_WARNINGS to `deny`, which is right
+          # for a lint job and wrong for this one. The toolchain here is pinned to
           # 1.75 for the sciter ABI, and the source is written for a newer
           # compiler: `#[allow(static_mut_refs)]` names a lint 1.75 does not
           # have, so `unknown_lints` fires, and `redundant_imports` differs by
@@ -118,7 +118,7 @@ jobs:
           #
           # Lints belong to `ci.yml`, which runs them on stable where the lint
           # set matches what the source expects. This job builds.
-          rustflags: ""
+          build-warnings: "warn"
 
       # By hand, for the same reason as ui.yml: subosito/flutter-action calls
       # actions/cache@v5 internally and this organization requires full-SHA
@@ -269,12 +269,12 @@ jobs:
           nasm --version
 
       - name: Set up Rust toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659  # v1.17.0
+        uses: actions-rust-lang/setup-rust-toolchain@ecabd13d1c56bd1345c230e542e9144811ad706f  # v2.0.0
         with:
           toolchain: ${{ env.RUST_VERSION }}
           components: rustfmt
           # Same reason as the Linux job: this builds, it does not lint.
-          rustflags: ""
+          build-warnings: "warn"
 
       - name: Install Flutter
         run: |
@@ -420,12 +420,12 @@ jobs:
           echo "ANDROID_NDK_ROOT=$ndk" >> "${GITHUB_ENV}"
 
       - name: Set up Rust toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659  # v1.17.0
+        uses: actions-rust-lang/setup-rust-toolchain@ecabd13d1c56bd1345c230e542e9144811ad706f  # v2.0.0
         with:
           toolchain: ${{ env.RUST_VERSION }}
           target: aarch64-linux-android
           components: rustfmt
-          rustflags: ""
+          build-warnings: "warn"
 
       - name: Install Flutter
         run: |
