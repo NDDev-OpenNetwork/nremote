@@ -58,7 +58,7 @@ jobs:
       contents: read
       id-token: write # mints the OIDC token its publication is signed with
       security-events: write # Scorecard publishes its findings to code scanning
-    uses: NDDev-OpenNetwork/ci-workflows/.github/workflows/public-scorecard.yml@37a827f921f62353664fc4bcd872f05b65efe71a # 0.1.24
+    uses: NDDev-OpenNetwork/ci-workflows/.github/workflows/public-scorecard.yml@a7b90bdf1ac12465cbd07072e3360442cfc8eec6 # 0.1.26
 
   # There is no `osv` job, and the absence is the honest answer rather than an
   # oversight.
