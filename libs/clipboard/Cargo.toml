@@ -35,7 +35,7 @@ parking_lot = {version = "0.12"}
 [target.'cfg(any(target_os = "linux", target_os = "macos"))'.dependencies]
 rand = {version = "0.10", optional = true}
 libc = {version = "0.2", optional = true}
-dashmap = {version ="5.5", optional = true}
+dashmap = {version ="6.1", optional = true}
 utf16string = {version = "0.2", optional = true}
 once_cell = {version = "1.18", optional = true}
 
